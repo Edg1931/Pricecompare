@@ -67,6 +67,17 @@ model Item {
   snapshots         PriceSnapshot[]
 }
 
+// Business expenses (mileage, supplies, etc.) for true net profit and taxes.
+model Expense {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  type        String   @default("other") // mileage | supplies | shipping | fees | other
+  description String?
+  amount      Float    @default(0)
+  miles       Float?
+  createdAt   DateTime @default(now())
+}
+
 // A point-in-time record of the estimated resale price, captured on each
 // analyze/re-analyze so a real price history builds up over time.
 model PriceSnapshot {

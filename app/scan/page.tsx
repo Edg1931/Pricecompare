@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, ImagePlus, X, Sparkles, Loader2 } from "lucide-react";
+import { Camera, ImagePlus, X, Sparkles, Loader2, ScanBarcode } from "lucide-react";
 import { fileToDataUrl } from "@/lib/image";
+import { BarcodeScanner, isBarcodeSupported } from "@/components/BarcodeScanner";
+import { VoiceInput } from "@/components/VoiceInput";
 
 const STAGES = [
   "Looking at your photos…",
@@ -21,6 +23,7 @@ export default function ScanPage() {
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -164,14 +167,41 @@ export default function ScanPage() {
         </label>
         <label className="block">
           <span className="text-sm font-medium">Hint (optional)</span>
-          <input
-            value={hint}
-            onChange={(e) => setHint(e.target.value)}
-            placeholder="e.g. brand, model, size — anything you know"
-            className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-3 outline-none placeholder:text-muted"
-          />
+          <div className="mt-1 flex items-center gap-2">
+            <input
+              value={hint}
+              onChange={(e) => setHint(e.target.value)}
+              placeholder="e.g. brand, model, size — anything you know"
+              className="w-full rounded-xl border border-border bg-surface px-3 py-3 outline-none placeholder:text-muted"
+            />
+            <VoiceInput
+              onResult={(text) =>
+                setHint((prev) => (prev.trim() ? `${prev} ${text}` : text))
+              }
+              className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-border bg-surface text-muted transition hover:text-brand"
+            />
+          </div>
+          {isBarcodeSupported() && (
+            <button
+              type="button"
+              onClick={() => setScanning(true)}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium text-muted transition hover:text-brand"
+            >
+              <ScanBarcode className="h-4 w-4" /> Scan barcode
+            </button>
+          )}
         </label>
       </div>
+
+      {scanning && (
+        <BarcodeScanner
+          onClose={() => setScanning(false)}
+          onDetected={(code) => {
+            setHint((prev) => (prev.trim() ? `${prev} UPC ${code}` : `UPC ${code}`));
+            setScanning(false);
+          }}
+        />
+      )}
 
       {error && (
         <p className="rounded-xl border border-over/40 bg-over/10 px-4 py-3 text-sm text-over">

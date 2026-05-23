@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Package, ArrowRight } from "lucide-react";
+import { Package, ArrowRight, Receipt } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { realizedPnL } from "@/lib/analysis/deal";
@@ -103,7 +103,15 @@ export default async function InventoryPage() {
           <h1 className="text-2xl font-bold tracking-tight">Inventory &amp; P&amp;L</h1>
           <p className="text-sm text-muted">Track what you own, what you sold, and your realized profit.</p>
         </div>
-        {hasData && <PnlExportButton rows={reportRows} totals={totals} />}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/expenses"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm font-medium text-muted transition hover:text-fg"
+          >
+            <Receipt className="h-4 w-4" /> Expenses
+          </Link>
+          {hasData && <PnlExportButton rows={reportRows} totals={totals} />}
+        </div>
       </div>
 
       {!hasData ? (

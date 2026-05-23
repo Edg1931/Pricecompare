@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw, Trash2, Check, Pencil, X, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { MARKETPLACES, marketplaceFee, realizedPnL } from "@/lib/analysis/deal";
+import { VoiceInput } from "@/components/VoiceInput";
 
 const FLOW = ["watching", "bought", "listed", "sold"] as const;
 const FLOW_LABEL: Record<string, string> = {
@@ -388,7 +389,12 @@ export function NotesEditor({
         placeholder="Private notes — buy price, where you found it, condition details…"
         className="w-full resize-y rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-brand"
       />
-      <div className="mt-2 flex justify-end">
+      <div className="mt-2 flex items-center justify-between">
+        <VoiceInput
+          onResult={(text) =>
+            setValue((prev) => (prev.trim() ? `${prev} ${text}` : text))
+          }
+        />
         <button
           onClick={save}
           disabled={!dirty || saving}
