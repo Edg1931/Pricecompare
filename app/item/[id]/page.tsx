@@ -19,6 +19,7 @@ import { sourcingMetrics, negotiation } from "@/lib/analysis/deal";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
 import { marketplaceLinks } from "@/lib/marketplaces";
+import { buildCrossListings } from "@/lib/crosslist";
 import type { Verdict } from "@/lib/types";
 import {
   Card,
@@ -31,6 +32,7 @@ import {
 import { PriceGauge } from "@/components/PriceGauge";
 import { PhotoCarousel } from "@/components/PhotoCarousel";
 import { PriceHistoryCard } from "@/components/PriceHistory";
+import { CrossListCard } from "@/components/CrossList";
 import { CopyButton, ShareButton } from "@/components/Copyable";
 import {
   AskingPriceEditor,
@@ -66,6 +68,17 @@ export default async function ItemPage({
     createdAt: s.createdAt.toISOString(),
   }));
   const market = marketplaceLinks(item.searchQuery ?? item.name);
+  const crossListings = buildCrossListings({
+    name: item.name,
+    brand: item.brand,
+    model: item.model,
+    category: item.category,
+    condition: item.condition,
+    listingTitle: item.listingTitle,
+    listingDescription: item.listingDescription,
+    recommendedMedian: item.recommendedMedian,
+    attributes,
+  });
   const demand = parseDemand(item.demand);
   const neg =
     item.soldPrice == null &&
@@ -324,6 +337,9 @@ export default async function ItemPage({
           )}
         </Card>
       )}
+
+      {/* Cross-list drafts */}
+      <CrossListCard listings={crossListings} />
 
       {/* Comparable listings */}
       <Card className="p-5">
