@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ScanLine, Sparkles } from "lucide-react";
+import { ScanLine, Sparkles, Images } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { parseNetProceeds } from "@/lib/item";
@@ -48,12 +48,20 @@ export default async function HomePage() {
             Photograph any object and instantly see what it resells for across eBay, Etsy,
             Mercari, Facebook Marketplace, Swappa and more — then know if it&apos;s a deal.
           </p>
-          <Link
-            href="/scan"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-brand to-brand-2 px-5 py-3 font-semibold text-white shadow-xl shadow-brand/30 transition hover:opacity-90"
-          >
-            <ScanLine className="h-5 w-5" /> Scan an item
-          </Link>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <Link
+              href="/scan"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-brand to-brand-2 px-5 py-3 font-semibold text-white shadow-xl shadow-brand/30 transition hover:opacity-90"
+            >
+              <ScanLine className="h-5 w-5" /> Scan an item
+            </Link>
+            <Link
+              href="/batch"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-3 font-medium transition hover:border-brand"
+            >
+              <Images className="h-5 w-5" /> Bulk upload
+            </Link>
+          </div>
         </div>
         <Sparkles className="absolute -right-6 -top-6 h-44 w-44 text-brand/10" />
       </div>
