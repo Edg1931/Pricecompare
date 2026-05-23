@@ -102,6 +102,7 @@ export default async function ItemPage({
               purchasePrice={item.purchasePrice}
               soldPrice={item.soldPrice}
               soldMarketplace={item.soldMarketplace}
+              soldFees={item.soldFees}
               shippingCost={item.shippingCost}
               projectedNet={netProceeds[0]?.net ?? null}
               bestPlatform={item.bestPlatform}

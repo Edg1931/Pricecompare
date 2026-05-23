@@ -54,6 +54,7 @@ model Item {
   purchasePrice     Float?    // what you actually paid
   soldPrice         Float?    // actual sale price
   soldMarketplace   String?   // where it sold
+  soldFees          Float?    // actual platform fees (overrides the estimate)
   shippingCost      Float?    // shipping you paid out of pocket
   soldAt            DateTime?
 

@@ -18,6 +18,7 @@ const patchSchema = z.object({
   purchasePrice: z.number().nonnegative().nullable().optional(),
   soldPrice: z.number().nonnegative().nullable().optional(),
   soldMarketplace: z.string().max(60).nullable().optional(),
+  soldFees: z.number().nonnegative().nullable().optional(),
   shippingCost: z.number().nonnegative().nullable().optional(),
 });
 
@@ -85,6 +86,7 @@ export async function PATCH(
       ...(data.searchQuery !== undefined ? { searchQuery: data.searchQuery } : {}),
       ...(data.purchasePrice !== undefined ? { purchasePrice: data.purchasePrice } : {}),
       ...(data.soldMarketplace !== undefined ? { soldMarketplace: data.soldMarketplace } : {}),
+      ...(data.soldFees !== undefined ? { soldFees: data.soldFees } : {}),
       ...(data.shippingCost !== undefined ? { shippingCost: data.shippingCost } : {}),
       ...(data.soldPrice !== undefined ? { soldPrice: data.soldPrice } : {}),
       ...soldAtUpdate,

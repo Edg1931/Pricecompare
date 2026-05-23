@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Trash2, Check, Pencil, X, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { MARKETPLACES, realizedPnL } from "@/lib/analysis/deal";
+import { MARKETPLACES, marketplaceFee, realizedPnL } from "@/lib/analysis/deal";
 
 const FLOW = ["watching", "bought", "listed", "sold"] as const;
 const FLOW_LABEL: Record<string, string> = {
@@ -27,6 +27,7 @@ interface FlipProps {
   purchasePrice: number | null;
   soldPrice: number | null;
   soldMarketplace: string | null;
+  soldFees: number | null;
   shippingCost: number | null;
   projectedNet: number | null; // best take-home at median
   bestPlatform: string | null;
@@ -46,6 +47,13 @@ export function FlipTracker(props: FlipProps) {
     props.soldMarketplace ?? props.bestPlatform ?? MARKETPLACES[0]
   );
   const [shipping, setShipping] = useState(String(props.shippingCost ?? ""));
+  const [feesInput, setFeesInput] = useState(String(props.soldFees ?? ""));
+  const [feesTouched, setFeesTouched] = useState(props.soldFees != null);
+
+  // The fee field shows the marketplace estimate until the user overrides it.
+  const estFee = marketplaceFee(marketplace, toNum(soldPrice) ?? 0);
+  const feesValue = feesTouched ? feesInput : estFee ? String(estFee) : "";
+  const effectiveFee = feesTouched ? toNum(feesInput) : estFee;
 
   const status = props.status ?? "analyzed";
   const sold = props.soldPrice != null;
@@ -75,6 +83,7 @@ export function FlipTracker(props: FlipProps) {
     soldPrice: props.soldPrice,
     soldMarketplace: props.soldMarketplace,
     shippingCost: props.shippingCost,
+    feesOverride: props.soldFees,
   });
 
   const preview = realizedPnL({
@@ -82,6 +91,7 @@ export function FlipTracker(props: FlipProps) {
     soldPrice: toNum(soldPrice),
     soldMarketplace: marketplace,
     shippingCost: toNum(shipping),
+    feesOverride: effectiveFee,
   });
 
   return (
@@ -189,12 +199,30 @@ export function FlipTracker(props: FlipProps) {
               ))}
             </select>
           </label>
+          <div>
+            <MoneyField
+              label="Platform fees"
+              value={feesValue}
+              onChange={(v) => {
+                setFeesTouched(true);
+                setFeesInput(v);
+              }}
+            />
+            {feesTouched && (
+              <button
+                onClick={() => setFeesTouched(false)}
+                className="mt-1 text-[11px] text-muted underline-offset-2 hover:underline"
+              >
+                Reset to estimate ({formatCurrency(estFee)})
+              </button>
+            )}
+          </div>
           <MoneyField label="Shipping you paid" value={shipping} onChange={setShipping} />
 
           {preview && (
             <div className="rounded-lg bg-surface-2/60 p-3 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-muted">Est. fees</span>
+                <span className="text-muted">Fees</span>
                 <span>− {formatCurrency(preview.fees)}</span>
               </div>
               <div className="mt-1 flex items-center justify-between font-semibold">
@@ -215,6 +243,7 @@ export function FlipTracker(props: FlipProps) {
                 soldPrice: toNum(soldPrice),
                 purchasePrice: toNum(buyPrice),
                 soldMarketplace: marketplace,
+                soldFees: effectiveFee,
                 shippingCost: toNum(shipping),
               })
             }

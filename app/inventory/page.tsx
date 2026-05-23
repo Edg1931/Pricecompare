@@ -33,6 +33,7 @@ export default async function InventoryPage() {
       soldPrice: i.soldPrice,
       soldMarketplace: i.soldMarketplace,
       shippingCost: i.shippingCost,
+      feesOverride: i.soldFees,
     })!;
     totals.revenue += pnl.revenue;
     totals.cost += pnl.cost;
@@ -41,6 +42,32 @@ export default async function InventoryPage() {
     totals.net += pnl.net;
     return { item: i, pnl };
   });
+
+  // Realized profit by period (from the sale date).
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const period = { mtd: 0, qtd: 0, ytd: 0 };
+  for (const { item, pnl } of soldRows) {
+    if (!item.soldAt) continue;
+    if (item.soldAt >= startOfMonth) period.mtd += pnl.net;
+    if (item.soldAt >= startOfQuarter) period.qtd += pnl.net;
+    if (item.soldAt >= startOfYear) period.ytd += pnl.net;
+  }
+
+  // Profit grouped by marketplace.
+  const byMkt = new Map<string, { count: number; revenue: number; net: number }>();
+  for (const { item, pnl } of soldRows) {
+    const key = item.soldMarketplace ?? "Unknown";
+    const cur = byMkt.get(key) ?? { count: 0, revenue: 0, net: 0 };
+    cur.count += 1;
+    cur.revenue += pnl.revenue;
+    cur.net += pnl.net;
+    byMkt.set(key, cur);
+  }
+  const mktRows = [...byMkt.entries()].sort((a, b) => b[1].net - a[1].net);
+  const maxMktNet = Math.max(1, ...mktRows.map(([, v]) => Math.abs(v.net)));
 
   const reportRows: PnlRow[] = [
     ...soldRows.map(({ item, pnl }) => ({
@@ -107,6 +134,66 @@ export default async function InventoryPage() {
               }
             />
           </div>
+
+          {/* Realized profit by period */}
+          {soldRows.length > 0 && (
+            <div className="grid grid-cols-3 gap-3">
+              <Stat
+                label="This month"
+                value={
+                  <span className={period.mtd >= 0 ? "text-steal" : "text-over"}>
+                    {formatCurrency(period.mtd)}
+                  </span>
+                }
+              />
+              <Stat
+                label="This quarter"
+                value={
+                  <span className={period.qtd >= 0 ? "text-steal" : "text-over"}>
+                    {formatCurrency(period.qtd)}
+                  </span>
+                }
+              />
+              <Stat
+                label="This year"
+                value={
+                  <span className={period.ytd >= 0 ? "text-steal" : "text-over"}>
+                    {formatCurrency(period.ytd)}
+                  </span>
+                }
+              />
+            </div>
+          )}
+
+          {/* Profit by marketplace */}
+          {mktRows.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold">Profit by marketplace</h2>
+              <div className="space-y-2 rounded-2xl border border-border bg-surface/70 p-4">
+                {mktRows.map(([name, v]) => (
+                  <div key={name} className="flex items-center gap-3">
+                    <div className="w-32 shrink-0 truncate text-sm">
+                      {name}
+                      <span className="ml-1 text-xs text-muted">({v.count})</span>
+                    </div>
+                    <div className="h-5 flex-1 overflow-hidden rounded-md bg-surface-2">
+                      <div
+                        className={`h-full rounded-md ${v.net >= 0 ? "bg-steal/60" : "bg-over/60"}`}
+                        style={{ width: `${Math.max(6, (Math.abs(v.net) / maxMktNet) * 100)}%` }}
+                      />
+                    </div>
+                    <div
+                      className={`w-24 shrink-0 text-right text-sm font-semibold tabular-nums ${
+                        v.net >= 0 ? "text-steal" : "text-over"
+                      }`}
+                    >
+                      {formatCurrency(v.net)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Holding */}
           {holding.length > 0 && (

@@ -50,11 +50,15 @@ export function realizedPnL(opts: {
   soldPrice: number | null;
   soldMarketplace: string | null;
   shippingCost: number | null;
+  feesOverride?: number | null;
 }): RealizedPnL | null {
   if (opts.soldPrice == null) return null;
   const revenue = opts.soldPrice;
   const cost = opts.purchasePrice ?? 0;
-  const fees = marketplaceFee(opts.soldMarketplace, revenue);
+  const fees =
+    opts.feesOverride != null
+      ? opts.feesOverride
+      : marketplaceFee(opts.soldMarketplace, revenue);
   const shipping = opts.shippingCost ?? 0;
   const net = Math.round((revenue - cost - fees - shipping) * 100) / 100;
   return { revenue, cost, fees, shipping, net };
