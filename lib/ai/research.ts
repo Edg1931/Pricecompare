@@ -80,7 +80,7 @@ Include 5-15 of the most relevant comps with real prices in USD. Only include co
       {
         type: "web_search_20250305",
         name: "web_search",
-        max_uses: 4,
+        max_uses: 2,
       } as never,
     ],
     messages: [{ role: "user", content: prompt }],
