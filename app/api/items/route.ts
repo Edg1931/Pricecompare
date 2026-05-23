@@ -6,7 +6,7 @@ import { persistAnalysis } from "@/lib/item";
 import { hasAnthropic } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const createSchema = z.object({
   images: z.array(z.string()).min(1, "At least one photo is required").max(8),

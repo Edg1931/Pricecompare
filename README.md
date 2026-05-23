@@ -11,29 +11,54 @@ glasses app — can reuse the same endpoints.
 
 ## Stack
 
-- **Next.js 16 (App Router) + TypeScript + Tailwind v4**
+- **Next.js 16 (App Router) + TypeScript + Tailwind v4**, installable as a PWA
 - **Claude (Anthropic)** — vision identifies the item from photos; web search researches
   resale prices and writes the listing
 - **eBay Browse API** — accurate comparable listings (optional but recommended)
-- **Prisma + SQLite** — stores items, photos, and price comps (swap to Postgres in one line)
+- **Supabase** — Postgres (items/photos/comps via Prisma) + Storage (uploaded photos)
 
-## Setup
-
-```bash
-npm install
-cp .env.example .env        # then fill in your keys
-npm run db:push             # create the SQLite database
-npm run dev                 # http://localhost:3000
-```
-
-### Environment variables (`.env`)
+## Environment variables
 
 | Variable | Required | Notes |
 | --- | --- | --- |
+| `DATABASE_URL` | yes | Supabase **pooled** connection (port 6543, `?pgbouncer=true`) |
+| `DIRECT_URL` | yes | Supabase **direct** connection (port 5432) for migrations |
+| `SUPABASE_URL` | yes* | `https://PROJECT.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes* | Server-only secret for photo uploads |
+| `SUPABASE_BUCKET` | no | Defaults to `item-photos` (create as a **public** bucket) |
 | `ANTHROPIC_API_KEY` | yes | Vision + research. https://console.anthropic.com |
 | `ANTHROPIC_MODEL` | no | Defaults to `claude-sonnet-4-6` |
 | `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` | no | Free dev account at https://developer.ebay.com. Without these, pricing falls back to Claude web search only. |
-| `DATABASE_URL` | yes | Defaults to `file:./dev.db` |
+
+\* If Supabase Storage isn't configured, photos fall back to the local `public/uploads`
+folder (fine for local dev, but won't work on Vercel).
+
+## Local development
+
+```bash
+npm install
+cp .env.example .env        # fill in Supabase + Anthropic values
+npm run db:push             # create tables in your Supabase Postgres
+npm run dev                 # http://localhost:3000
+```
+
+## Deploy to Vercel (mobile-ready, HTTPS for camera)
+
+1. **Supabase** — create a free project. Then:
+   - Project Settings → Database → copy the **pooled** and **direct** connection strings
+     into `DATABASE_URL` and `DIRECT_URL`.
+   - Storage → create a **public** bucket named `item-photos`.
+   - Project Settings → API → copy the URL and the **service_role** key.
+   - Run `npm run db:push` once (locally, with your `.env` filled in) to create the tables.
+2. **Vercel** — import the GitHub repo. Add all env vars above in Project → Settings →
+   Environment Variables. Deploy.
+3. **On your phone** — open the Vercel HTTPS URL. The scan screen opens the camera
+   directly; use the browser's "Add to Home Screen" to install it as an app. The same URL
+   also works in the Inmo Air 3 browser.
+
+> The analyze endpoint runs Claude vision + web research and can take ~40–60s. `maxDuration`
+> is set to 60s (Vercel's free-tier ceiling). If you hit timeouts, lower `web_search` uses in
+> `lib/ai/research.ts` or upgrade the Vercel plan.
 
 ## How it works
 

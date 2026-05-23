@@ -6,7 +6,7 @@ import { hasAnthropic } from "@/lib/ai/client";
 import type { ItemIdentification } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function POST(
   _req: Request,
