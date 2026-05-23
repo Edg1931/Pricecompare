@@ -1,7 +1,30 @@
 import { cn, formatCurrency } from "@/lib/utils";
-import { VERDICT_META } from "@/lib/display";
+import { VERDICT_META, statusMeta } from "@/lib/display";
 import type { SourcingMetrics, Verdict } from "@/lib/types";
 import { TrendingUp } from "lucide-react";
+
+export function StatusBadge({
+  status,
+  className,
+}: {
+  status: string | null;
+  className?: string;
+}) {
+  if (!status || status === "analyzed") return null;
+  const m = statusMeta(status);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
+        m.bg,
+        m.color,
+        className
+      )}
+    >
+      {m.label}
+    </span>
+  );
+}
 
 export function Card({
   className,

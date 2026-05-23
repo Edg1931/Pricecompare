@@ -25,6 +25,7 @@ export default async function HomePage() {
       model: it.model,
       category: it.category,
       verdict: it.verdict,
+      status: it.status,
       recommendedMedian: it.recommendedMedian,
       dealScore: it.dealScore,
       askingPrice: it.askingPrice,

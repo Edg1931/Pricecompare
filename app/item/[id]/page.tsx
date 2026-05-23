@@ -11,7 +11,13 @@ import { sourcingMetrics } from "@/lib/analysis/deal";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
 import type { Verdict } from "@/lib/types";
-import { Card, VerdictBadge, ConfidenceBar, SourcingCard } from "@/components/ui";
+import {
+  Card,
+  VerdictBadge,
+  StatusBadge,
+  ConfidenceBar,
+  SourcingCard,
+} from "@/components/ui";
 import { PriceGauge } from "@/components/PriceGauge";
 import { PhotoCarousel } from "@/components/PhotoCarousel";
 import { PriceHistoryCard } from "@/components/PriceHistory";
@@ -20,6 +26,8 @@ import {
   AskingPriceEditor,
   ItemActions,
   EditDetailsButton,
+  StatusControl,
+  NotesEditor,
 } from "@/components/ItemControls";
 
 export default async function ItemPage({
@@ -84,6 +92,9 @@ export default async function ItemPage({
             />
             <ShareButton title={item.name} />
           </div>
+          <Card className="p-4">
+            <StatusControl itemId={item.id} initial={item.status} />
+          </Card>
         </div>
 
         {/* Right: details */}
@@ -91,6 +102,7 @@ export default async function ItemPage({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <VerdictBadge verdict={item.verdict as Verdict | null} />
+              <StatusBadge status={item.status} />
               {item.category && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-1 text-xs text-muted">
                   <Tag className="h-3 w-3" /> {item.category}
@@ -305,6 +317,12 @@ export default async function ItemPage({
             })}
           </div>
         )}
+      </Card>
+
+      {/* Notes */}
+      <Card className="p-5">
+        <h2 className="mb-3 font-semibold">Notes</h2>
+        <NotesEditor itemId={item.id} initial={item.notes} />
       </Card>
 
       {/* Attributes */}
