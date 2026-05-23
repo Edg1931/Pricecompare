@@ -61,3 +61,12 @@ export interface ListingKit {
   title: string;
   description: string;
 }
+
+export interface SourcingMetrics {
+  bestPlatform: string | null;
+  bestNet: number; // take-home at median sale price, best platform
+  profit: number; // bestNet - asking
+  roiPct: number; // profit / asking * 100
+  breakEvenSell: number; // sale price needed to recoup the asking price after fees
+  recommendation: "BUY" | "CONSIDER" | "PASS";
+}

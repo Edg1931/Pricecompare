@@ -1,4 +1,9 @@
-import type { DealAnalysis, PlatformNet, Verdict } from "@/lib/types";
+import type {
+  DealAnalysis,
+  PlatformNet,
+  SourcingMetrics,
+  Verdict,
+} from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
 /** Approximate seller fee models per platform (estimates; fees change over time). */
@@ -18,6 +23,36 @@ export function computeNetProceeds(salePrice: number): PlatformNet[] {
     feePct: pct,
     net: Math.max(0, Math.round((salePrice * (1 - pct) - fixed) * 100) / 100),
   })).sort((a, b) => b.net - a.net);
+}
+
+/**
+ * Sourcing math for buyers: ROI, break-even resale price, and a buy/pass call.
+ * Returns null when there isn't enough data (no median or no asking price).
+ */
+export function sourcingMetrics(
+  median: number | null,
+  askingPrice: number | null,
+  netProceeds: PlatformNet[]
+): SourcingMetrics | null {
+  if (!median || !askingPrice || askingPrice <= 0) return null;
+  const best = netProceeds[0] ?? null;
+  const bestNet = best?.net ?? median;
+  const feePct = best?.feePct ?? 0;
+  const profit = Math.round((bestNet - askingPrice) * 100) / 100;
+  const roiPct = Math.round((profit / askingPrice) * 1000) / 10;
+  // Sale price whose take-home (after the best platform's fee) equals the buy price.
+  const breakEvenSell = Math.round((askingPrice / (1 - feePct)) * 100) / 100;
+  const ratio = askingPrice / median;
+  const recommendation: SourcingMetrics["recommendation"] =
+    ratio <= 0.85 ? "BUY" : ratio <= 1.1 ? "CONSIDER" : "PASS";
+  return {
+    bestPlatform: best?.platform ?? null,
+    bestNet,
+    profit,
+    roiPct,
+    breakEvenSell,
+    recommendation,
+  };
 }
 
 function verdictFor(ratio: number): Verdict {
