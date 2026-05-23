@@ -44,11 +44,30 @@ model Item {
   listingTitle      String?
   listingDescription String?
 
+  // Estimated sold-price trend over time (JSON: current/m3/m6/y1 + direction)
+  priceTrend        String?
+
   status            String  @default("analyzed")
   notes             String?
 
   photos            Photo[]
   comps             Comp[]
+  snapshots         PriceSnapshot[]
+}
+
+// A point-in-time record of the estimated resale price, captured on each
+// analyze/re-analyze so a real price history builds up over time.
+model PriceSnapshot {
+  id         String   @id @default(cuid())
+  itemId     String
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  low        Float?
+  median     Float?
+  high       Float?
+  sampleSize Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([itemId])
 }
 
 model Photo {

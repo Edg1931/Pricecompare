@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { savePhotos } from "@/lib/storage";
 import type { AnalysisResult } from "@/lib/analysis/pipeline";
-import type { PlatformNet } from "@/lib/types";
+import type { PlatformNet, PriceTrend } from "@/lib/types";
 
 /** Create an Item row (+photos +comps) from an analysis result. */
 export async function persistAnalysis(
@@ -35,7 +35,18 @@ export async function persistAnalysis(
       analysisSummary: deal.summary,
       listingTitle: result.listing?.title ?? null,
       listingDescription: result.listing?.description ?? null,
+      priceTrend: result.trend ? JSON.stringify(result.trend) : null,
       notes: opts.notes ?? null,
+      snapshots: {
+        create: [
+          {
+            low: aggregate.low,
+            median: aggregate.median,
+            high: aggregate.high,
+            sampleSize: aggregate.sampleSize,
+          },
+        ],
+      },
       comps: {
         create: result.comps.map((c) => ({
           source: c.source,
@@ -69,6 +80,7 @@ export async function getItem(id: string) {
     include: {
       photos: { orderBy: { order: "asc" } },
       comps: { orderBy: { price: "asc" } },
+      snapshots: { orderBy: { createdAt: "asc" } },
     },
   });
 }
@@ -90,5 +102,15 @@ export function parseNetProceeds(json: string | null): PlatformNet[] {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+
+export function parsePriceTrend(json: string | null): PriceTrend | null {
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === "object" ? (parsed as PriceTrend) : null;
+  } catch {
+    return null;
   }
 }

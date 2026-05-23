@@ -1,9 +1,38 @@
-import type { CompSource, ItemIdentification, RawComp } from "@/lib/types";
+import type {
+  CompSource,
+  ItemIdentification,
+  PriceTrend,
+  RawComp,
+} from "@/lib/types";
 import { getAnthropic, MODEL } from "./client";
 
 export interface ResearchResult {
   comps: RawComp[];
   marketContext: string | null;
+  trend: PriceTrend | null;
+}
+
+function parseTrend(obj: unknown): PriceTrend | null {
+  if (!obj || typeof obj !== "object") return null;
+  const t = obj as Record<string, unknown>;
+  const num = (v: unknown): number | null => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const dir = t.direction;
+  const direction =
+    dir === "rising" || dir === "stable" || dir === "falling" ? dir : null;
+  const trend: PriceTrend = {
+    current: num(t.current),
+    m3: num(t.m3),
+    m6: num(t.m6),
+    y1: num(t.y1),
+    direction,
+    note: typeof t.note === "string" ? t.note : null,
+  };
+  // Only keep it if at least one window has a value.
+  if (trend.current || trend.m3 || trend.m6 || trend.y1) return trend;
+  return null;
 }
 
 const VALID_SOURCES: CompSource[] = [
@@ -63,15 +92,25 @@ Search query: ${ident.searchQuery}
 
 Use web search to find comparable listings and recent sold prices across eBay, Etsy, Mercari, Facebook Marketplace, Swappa, Poshmark, and StockX. If you cannot find this exact item on resale sites, research the web to figure out what it is and find the closest comparable items, then price those.
 
+Also estimate how this item's resale value has trended over time. Based on sold listings and demand, estimate the typical median SOLD price now, ~3 months ago, ~6 months ago, and ~1 year ago. These are best-effort estimates.
+
 After researching, respond with ONLY a JSON object in a \`\`\`json code block, in this exact shape:
 {
   "marketContext": "1-2 sentence summary of demand, typical price range, and how confident you are.",
+  "trend": {
+    "current": 123.45,
+    "m3": 120.00,
+    "m6": 130.00,
+    "y1": 150.00,
+    "direction": "rising|stable|falling",
+    "note": "1 sentence on whether demand/price is rising or falling and why."
+  },
   "comps": [
     { "source": "ebay|etsy|mercari|facebook|swappa|poshmark|stockx|web", "title": "listing title", "price": 123.45, "url": "https://...", "condition": "New|Used|...", "listingType": "active|sold" }
   ]
 }
 
-Include 5-15 of the most relevant comps with real prices in USD. Only include comps you actually found.`;
+For the trend, use null for any window you genuinely cannot estimate. Include 5-15 of the most relevant comps with real prices in USD. Only include comps you actually found.`;
 
   const response = await anthropic.messages.create({
     model: MODEL,
@@ -92,11 +131,11 @@ Include 5-15 of the most relevant comps with real prices in USD. Only include co
     .join("\n");
 
   const parsed = extractJsonBlock(text) as
-    | { marketContext?: string; comps?: unknown[] }
+    | { marketContext?: string; comps?: unknown[]; trend?: unknown }
     | null;
 
   if (!parsed || !Array.isArray(parsed.comps)) {
-    return { comps: [], marketContext: null };
+    return { comps: [], marketContext: null, trend: parseTrend(parsed?.trend) };
   }
 
   const comps: RawComp[] = [];
@@ -123,5 +162,6 @@ Include 5-15 of the most relevant comps with real prices in USD. Only include co
     comps,
     marketContext:
       typeof parsed.marketContext === "string" ? parsed.marketContext : null,
+    trend: parseTrend(parsed.trend),
   };
 }
