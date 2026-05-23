@@ -23,15 +23,19 @@ export async function priceAndAnalyze(
   identification: ItemIdentification,
   askingPrice: number | null
 ): Promise<AnalysisResult> {
-  const [ebayComps, research] = await Promise.all([
+  // Run pricing research and listing generation concurrently so the listing
+  // doesn't add to the critical path (it would otherwise push us past
+  // Vercel's 60s function limit). The listing only uses price for one
+  // optional line, so it's fine to generate it without the median.
+  const [ebayComps, research, listing] = await Promise.all([
     hasEbay() ? searchEbay(identification.searchQuery) : Promise.resolve([]),
     researchPrices(identification),
+    generateListing(identification, null),
   ]);
 
   const comps = [...ebayComps, ...research.comps];
   const aggregate = aggregatePrices(comps);
   const deal = analyzeDeal(aggregate.median, askingPrice);
-  const listing = await generateListing(identification, aggregate.median);
 
   return {
     identification,
