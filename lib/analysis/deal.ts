@@ -17,6 +17,49 @@ const PLATFORM_FEES: { platform: string; pct: number; fixed: number }[] = [
   { platform: "Facebook Marketplace", pct: 0.0, fixed: 0 }, // local pickup
 ];
 
+/** Marketplaces the user can pick when recording a sale. */
+export const MARKETPLACES = [
+  ...PLATFORM_FEES.map((p) => p.platform),
+  "Other / local",
+];
+
+/** Estimated platform fee for a sale at the given price on a marketplace. */
+export function marketplaceFee(
+  marketplace: string | null | undefined,
+  salePrice: number
+): number {
+  if (!marketplace) return 0;
+  const fee = PLATFORM_FEES.find(
+    (p) => p.platform.toLowerCase() === marketplace.toLowerCase()
+  );
+  if (!fee) return 0;
+  return Math.round((salePrice * fee.pct + fee.fixed) * 100) / 100;
+}
+
+export interface RealizedPnL {
+  revenue: number;
+  cost: number; // what you paid for the item
+  fees: number; // platform fees
+  shipping: number;
+  net: number; // realized profit/loss
+}
+
+/** Realized profit/loss for a sold item, or null if it hasn't sold. */
+export function realizedPnL(opts: {
+  purchasePrice: number | null;
+  soldPrice: number | null;
+  soldMarketplace: string | null;
+  shippingCost: number | null;
+}): RealizedPnL | null {
+  if (opts.soldPrice == null) return null;
+  const revenue = opts.soldPrice;
+  const cost = opts.purchasePrice ?? 0;
+  const fees = marketplaceFee(opts.soldMarketplace, revenue);
+  const shipping = opts.shippingCost ?? 0;
+  const net = Math.round((revenue - cost - fees - shipping) * 100) / 100;
+  return { revenue, cost, fees, shipping, net };
+}
+
 export function computeNetProceeds(salePrice: number): PlatformNet[] {
   return PLATFORM_FEES.map(({ platform, pct, fixed }) => ({
     platform,

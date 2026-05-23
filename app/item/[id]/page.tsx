@@ -27,7 +27,7 @@ import {
   AskingPriceEditor,
   ItemActions,
   EditDetailsButton,
-  StatusControl,
+  FlipTracker,
   NotesEditor,
 } from "@/components/ItemControls";
 
@@ -95,7 +95,17 @@ export default async function ItemPage({
             <ShareButton title={item.name} />
           </div>
           <Card className="p-4">
-            <StatusControl itemId={item.id} initial={item.status} />
+            <FlipTracker
+              itemId={item.id}
+              status={item.status}
+              askingPrice={item.askingPrice}
+              purchasePrice={item.purchasePrice}
+              soldPrice={item.soldPrice}
+              soldMarketplace={item.soldMarketplace}
+              shippingCost={item.shippingCost}
+              projectedNet={netProceeds[0]?.net ?? null}
+              bestPlatform={item.bestPlatform}
+            />
           </Card>
         </div>
 

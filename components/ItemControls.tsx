@@ -4,47 +4,323 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Trash2, Check, Pencil, X, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { STATUS_OPTIONS, statusMeta } from "@/lib/display";
+import { MARKETPLACES, realizedPnL } from "@/lib/analysis/deal";
 
-export function StatusControl({
-  itemId,
-  initial,
-}: {
+const FLOW = ["watching", "bought", "listed", "sold"] as const;
+const FLOW_LABEL: Record<string, string> = {
+  watching: "Watching",
+  bought: "Bought",
+  listed: "Listed",
+  sold: "Sold",
+};
+
+function toNum(s: string): number | null {
+  if (s.trim() === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+interface FlipProps {
   itemId: string;
-  initial: string | null;
-}) {
-  const router = useRouter();
-  const [status, setStatus] = useState(initial ?? "analyzed");
-  const [saving, setSaving] = useState(false);
+  status: string | null;
+  askingPrice: number | null;
+  purchasePrice: number | null;
+  soldPrice: number | null;
+  soldMarketplace: string | null;
+  shippingCost: number | null;
+  projectedNet: number | null; // best take-home at median
+  bestPlatform: string | null;
+}
 
-  async function change(next: string) {
-    setStatus(next);
-    setSaving(true);
-    await fetch(`/api/items/${itemId}`, {
+export function FlipTracker(props: FlipProps) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [boughtOpen, setBoughtOpen] = useState(false);
+  const [soldOpen, setSoldOpen] = useState(false);
+
+  const [buyPrice, setBuyPrice] = useState(
+    String(props.purchasePrice ?? props.askingPrice ?? "")
+  );
+  const [soldPrice, setSoldPrice] = useState(String(props.soldPrice ?? ""));
+  const [marketplace, setMarketplace] = useState(
+    props.soldMarketplace ?? props.bestPlatform ?? MARKETPLACES[0]
+  );
+  const [shipping, setShipping] = useState(String(props.shippingCost ?? ""));
+
+  const status = props.status ?? "analyzed";
+  const sold = props.soldPrice != null;
+  const costBasis = props.purchasePrice ?? props.askingPrice ?? null;
+
+  async function patch(body: Record<string, unknown>) {
+    setBusy(true);
+    await fetch(`/api/items/${props.itemId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: next }),
+      body: JSON.stringify(body),
     });
-    setSaving(false);
+    setBusy(false);
+    setBoughtOpen(false);
+    setSoldOpen(false);
     router.refresh();
   }
 
+  function clickStatus(key: string) {
+    if (key === "bought") return setBoughtOpen(true);
+    if (key === "sold") return setSoldOpen(true);
+    patch({ status: key });
+  }
+
+  const pnl = realizedPnL({
+    purchasePrice: costBasis,
+    soldPrice: props.soldPrice,
+    soldMarketplace: props.soldMarketplace,
+    shippingCost: props.shippingCost,
+  });
+
+  const preview = realizedPnL({
+    purchasePrice: toNum(buyPrice),
+    soldPrice: toNum(soldPrice),
+    soldMarketplace: marketplace,
+    shippingCost: toNum(shipping),
+  });
+
   return (
-    <div className="inline-flex items-center gap-2">
-      <span className="text-xs uppercase tracking-wide text-muted">Status</span>
-      <select
-        value={status}
-        onChange={(e) => change(e.target.value)}
-        className="rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm font-medium outline-none focus:border-brand"
-      >
-        {STATUS_OPTIONS.map((s) => (
-          <option key={s} value={s}>
-            {statusMeta(s).label}
-          </option>
-        ))}
-      </select>
-      {saving && <Loader2 className="h-4 w-4 animate-spin text-muted" />}
+    <div className="space-y-3">
+      {/* Lifecycle pills */}
+      <div className="flex flex-wrap gap-1.5">
+        {FLOW.map((key) => {
+          const active = status === key;
+          return (
+            <button
+              key={key}
+              onClick={() => clickStatus(key)}
+              disabled={busy}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 ${
+                active
+                  ? "bg-brand text-white"
+                  : "border border-border bg-surface-2 text-muted hover:text-fg"
+              }`}
+            >
+              {FLOW_LABEL[key]}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Contextual body */}
+      {sold && pnl ? (
+        <div className="rounded-xl border border-border bg-surface-2/50 p-3 text-sm">
+          <Row label="Sold price" value={formatCurrency(pnl.revenue)} />
+          {props.soldMarketplace && (
+            <Row label="Marketplace" value={props.soldMarketplace} plain />
+          )}
+          <Row label="Cost" value={`− ${formatCurrency(pnl.cost)}`} muted />
+          <Row label="Platform fees" value={`− ${formatCurrency(pnl.fees)}`} muted />
+          <Row label="Shipping" value={`− ${formatCurrency(pnl.shipping)}`} muted />
+          <div className="mt-1 flex items-center justify-between border-t border-border pt-2 font-semibold">
+            <span>Realized {pnl.net >= 0 ? "profit" : "loss"}</span>
+            <span className={pnl.net >= 0 ? "text-steal" : "text-over"}>
+              {formatCurrency(pnl.net)}
+            </span>
+          </div>
+          <button
+            onClick={() => setSoldOpen(true)}
+            className="mt-2 text-xs text-muted underline-offset-2 hover:underline"
+          >
+            Edit sale details
+          </button>
+        </div>
+      ) : status === "bought" || status === "listed" ? (
+        <div className="rounded-xl border border-border bg-surface-2/50 p-3 text-sm">
+          <Row
+            label="Cost basis"
+            value={costBasis != null ? formatCurrency(costBasis) : "—"}
+          />
+          {props.projectedNet != null && costBasis != null && (
+            <Row
+              label="Projected profit"
+              value={formatCurrency(props.projectedNet - costBasis)}
+              muted
+            />
+          )}
+          <button
+            onClick={() => setSoldOpen(true)}
+            className="mt-2 w-full rounded-lg bg-gradient-to-br from-brand to-brand-2 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            Mark as sold
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs text-muted">
+          Mark this <span className="font-medium">Bought</span> when you buy it to
+          track cost and profit.
+        </p>
+      )}
+
+      {/* Bought modal */}
+      {boughtOpen && (
+        <Modal title="Mark as bought" onClose={() => setBoughtOpen(false)}>
+          <MoneyField label="What did you pay?" value={buyPrice} onChange={setBuyPrice} autoFocus />
+          <ModalActions
+            busy={busy}
+            onSave={() =>
+              patch({ status: "bought", purchasePrice: toNum(buyPrice) })
+            }
+          />
+        </Modal>
+      )}
+
+      {/* Sold modal */}
+      {soldOpen && (
+        <Modal title="Record the sale" onClose={() => setSoldOpen(false)}>
+          <MoneyField label="Sold price" value={soldPrice} onChange={setSoldPrice} autoFocus />
+          <MoneyField label="Your cost (what you paid)" value={buyPrice} onChange={setBuyPrice} />
+          <label className="block">
+            <span className="text-xs uppercase tracking-wide text-muted">Marketplace</span>
+            <select
+              value={marketplace}
+              onChange={(e) => setMarketplace(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-brand"
+            >
+              {MARKETPLACES.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+          <MoneyField label="Shipping you paid" value={shipping} onChange={setShipping} />
+
+          {preview && (
+            <div className="rounded-lg bg-surface-2/60 p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted">Est. fees</span>
+                <span>− {formatCurrency(preview.fees)}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between font-semibold">
+                <span>Realized {preview.net >= 0 ? "profit" : "loss"}</span>
+                <span className={preview.net >= 0 ? "text-steal" : "text-over"}>
+                  {formatCurrency(preview.net)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <ModalActions
+            busy={busy}
+            saveLabel="Save sale"
+            onSave={() =>
+              patch({
+                status: "sold",
+                soldPrice: toNum(soldPrice),
+                purchasePrice: toNum(buyPrice),
+                soldMarketplace: marketplace,
+                shippingCost: toNum(shipping),
+              })
+            }
+          />
+        </Modal>
+      )}
     </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  muted,
+  plain,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+  plain?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between py-0.5">
+      <span className="text-muted">{label}</span>
+      <span className={plain ? "" : `tabular-nums ${muted ? "text-muted" : "font-medium"}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-semibold">{title}</h3>
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:text-fg"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-3">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function MoneyField({
+  label,
+  value,
+  onChange,
+  autoFocus,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoFocus?: boolean;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs uppercase tracking-wide text-muted">{label}</span>
+      <div className="mt-1 flex items-center rounded-lg border border-border bg-surface-2 px-3">
+        <span className="text-muted">$</span>
+        <input
+          autoFocus={autoFocus}
+          type="number"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full bg-transparent px-2 py-2 text-sm outline-none"
+          placeholder="0"
+        />
+      </div>
+    </label>
+  );
+}
+
+function ModalActions({
+  busy,
+  onSave,
+  saveLabel = "Save",
+}: {
+  busy: boolean;
+  onSave: () => void;
+  saveLabel?: string;
+}) {
+  return (
+    <button
+      onClick={onSave}
+      disabled={busy}
+      className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-br from-brand to-brand-2 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+    >
+      {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+      {saveLabel}
+    </button>
   );
 }
 
