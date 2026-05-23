@@ -1,0 +1,63 @@
+export type CompSource =
+  | "ebay"
+  | "etsy"
+  | "mercari"
+  | "facebook"
+  | "swappa"
+  | "poshmark"
+  | "stockx"
+  | "web";
+
+export interface RawComp {
+  source: CompSource;
+  title: string;
+  price: number;
+  currency?: string;
+  url?: string | null;
+  condition?: string | null;
+  listingType?: "active" | "sold";
+}
+
+export interface ItemIdentification {
+  name: string;
+  brand?: string | null;
+  model?: string | null;
+  category?: string | null;
+  condition?: string | null;
+  conditionNotes?: string | null;
+  attributes: { label: string; value: string }[];
+  searchQuery: string;
+  confidence: number; // 0..1
+  reasoning?: string | null;
+}
+
+export interface PriceAggregate {
+  low: number | null;
+  median: number | null;
+  high: number | null;
+  confidence: number; // 0..1
+  sampleSize: number;
+  bySource: Record<string, { count: number; median: number }>;
+}
+
+export type Verdict = "STEAL" | "GOOD" | "FAIR" | "OVERPRICED";
+
+export interface PlatformNet {
+  platform: string;
+  net: number;
+  feePct: number;
+}
+
+export interface DealAnalysis {
+  dealScore: number | null; // 0..100
+  verdict: Verdict | null;
+  netProceeds: PlatformNet[];
+  bestPlatform: string | null;
+  estimatedProfit: number | null;
+  summary: string;
+}
+
+export interface ListingKit {
+  title: string;
+  description: string;
+}
