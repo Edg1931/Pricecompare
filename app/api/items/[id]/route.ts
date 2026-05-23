@@ -15,6 +15,10 @@ const patchSchema = z.object({
   category: z.string().max(120).nullable().optional(),
   condition: z.string().max(120).nullable().optional(),
   searchQuery: z.string().max(300).nullable().optional(),
+  purchasePrice: z.number().nonnegative().nullable().optional(),
+  soldPrice: z.number().nonnegative().nullable().optional(),
+  soldMarketplace: z.string().max(60).nullable().optional(),
+  shippingCost: z.number().nonnegative().nullable().optional(),
 });
 
 export async function GET(
@@ -44,6 +48,16 @@ export async function PATCH(
   }
   const data = parsed.data;
 
+  // Stamp/clear the sale date when the sold price is set or removed.
+  let soldAtUpdate = {};
+  if (data.soldPrice !== undefined) {
+    if (data.soldPrice != null && !existing.soldAt) {
+      soldAtUpdate = { soldAt: new Date() };
+    } else if (data.soldPrice == null) {
+      soldAtUpdate = { soldAt: null };
+    }
+  }
+
   // If the asking price changed, recompute the deal locally (no new AI calls).
   let dealUpdate = {};
   if ("askingPrice" in data) {
@@ -69,6 +83,11 @@ export async function PATCH(
       ...(data.category !== undefined ? { category: data.category } : {}),
       ...(data.condition !== undefined ? { condition: data.condition } : {}),
       ...(data.searchQuery !== undefined ? { searchQuery: data.searchQuery } : {}),
+      ...(data.purchasePrice !== undefined ? { purchasePrice: data.purchasePrice } : {}),
+      ...(data.soldMarketplace !== undefined ? { soldMarketplace: data.soldMarketplace } : {}),
+      ...(data.shippingCost !== undefined ? { shippingCost: data.shippingCost } : {}),
+      ...(data.soldPrice !== undefined ? { soldPrice: data.soldPrice } : {}),
+      ...soldAtUpdate,
       ...dealUpdate,
     },
   });

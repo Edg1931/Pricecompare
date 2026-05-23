@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
-import { ScanLine, LayoutGrid, Images } from "lucide-react";
+import { ScanLine, LayoutGrid, Images, Wallet } from "lucide-react";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -49,6 +49,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
               >
                 <Images className="h-4 w-4" /> Bulk
+              </Link>
+              <Link
+                href="/inventory"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
+              >
+                <Wallet className="h-4 w-4" /> Inventory
               </Link>
               <Link
                 href="/scan"
