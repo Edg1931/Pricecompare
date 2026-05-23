@@ -2,14 +2,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, Tag, TrendingUp, Trophy } from "lucide-react";
 import { getItem, parseAttributes, parseNetProceeds } from "@/lib/item";
+import { sourcingMetrics } from "@/lib/analysis/deal";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
 import type { Verdict } from "@/lib/types";
-import { Card, VerdictBadge, ConfidenceBar } from "@/components/ui";
+import { Card, VerdictBadge, ConfidenceBar, SourcingCard } from "@/components/ui";
 import { PriceGauge } from "@/components/PriceGauge";
 import { PhotoCarousel } from "@/components/PhotoCarousel";
-import { CopyButton } from "@/components/Copyable";
-import { AskingPriceEditor, ItemActions } from "@/components/ItemControls";
+import { CopyButton, ShareButton } from "@/components/Copyable";
+import {
+  AskingPriceEditor,
+  ItemActions,
+  EditDetailsButton,
+} from "@/components/ItemControls";
 
 export default async function ItemPage({
   params,
@@ -23,6 +28,14 @@ export default async function ItemPage({
   const attributes = parseAttributes(item.attributes);
   const netProceeds = parseNetProceeds(item.netProceeds);
   const subtitle = [item.brand, item.model].filter(Boolean).join(" · ");
+  const sourcing = sourcingMetrics(
+    item.recommendedMedian,
+    item.askingPrice,
+    netProceeds
+  );
+  const fullListing = [item.listingTitle, item.listingDescription]
+    .filter(Boolean)
+    .join("\n\n");
 
   // group comps by source
   const grouped = new Map<string, typeof item.comps>();
@@ -45,7 +58,21 @@ export default async function ItemPage({
         {/* Left: photos */}
         <div className="space-y-4">
           <PhotoCarousel photos={item.photos} />
-          <ItemActions itemId={item.id} />
+          <div className="flex flex-wrap items-center gap-2">
+            <ItemActions itemId={item.id} />
+            <EditDetailsButton
+              item={{
+                id: item.id,
+                name: item.name,
+                brand: item.brand,
+                model: item.model,
+                category: item.category,
+                condition: item.condition,
+                searchQuery: item.searchQuery,
+              }}
+            />
+            <ShareButton title={item.name} />
+          </div>
         </div>
 
         {/* Right: details */}
@@ -122,6 +149,9 @@ export default async function ItemPage({
         </div>
       </div>
 
+      {/* Sourcing / ROI */}
+      {sourcing && <SourcingCard metrics={sourcing} />}
+
       {/* Best platform + net proceeds */}
       {netProceeds.length > 0 && (
         <Card className="p-5">
@@ -169,6 +199,11 @@ export default async function ItemPage({
           <div className="mb-3 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-accent" />
             <h2 className="font-semibold">Ready-to-post listing</h2>
+            {fullListing && (
+              <span className="ml-auto">
+                <CopyButton text={fullListing} label="Copy all" />
+              </span>
+            )}
           </div>
           {item.listingTitle && (
             <div className="mb-3">

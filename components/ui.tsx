@@ -1,6 +1,7 @@
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { VERDICT_META } from "@/lib/display";
-import type { Verdict } from "@/lib/types";
+import type { SourcingMetrics, Verdict } from "@/lib/types";
+import { TrendingUp } from "lucide-react";
 
 export function Card({
   className,
@@ -74,6 +75,60 @@ export function ConfidenceBar({
         <div
           className="h-full rounded-full bg-gradient-to-r from-brand to-accent transition-all"
           style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+const SOURCING_META = {
+  BUY: { label: "Buy it", color: "text-steal", bg: "bg-steal/15", emoji: "✅" },
+  CONSIDER: { label: "Consider", color: "text-fair", bg: "bg-fair/15", emoji: "🤔" },
+  PASS: { label: "Pass", color: "text-over", bg: "bg-over/15", emoji: "🚫" },
+} as const;
+
+export function SourcingCard({ metrics }: { metrics: SourcingMetrics }) {
+  const m = SOURCING_META[metrics.recommendation];
+  return (
+    <div className="rounded-2xl border border-border bg-surface/70 p-5 backdrop-blur-sm">
+      <div className="mb-4 flex items-center gap-2">
+        <TrendingUp className="h-4 w-4 text-brand" />
+        <h2 className="font-semibold">Should you buy it?</h2>
+        <span
+          className={cn(
+            "ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
+            m.bg,
+            m.color
+          )}
+        >
+          <span>{m.emoji}</span>
+          {m.label}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <Stat
+          label="Est. profit"
+          value={
+            <span className={metrics.profit >= 0 ? "text-steal" : "text-over"}>
+              {formatCurrency(metrics.profit)}
+            </span>
+          }
+          sub={metrics.bestPlatform ? `on ${metrics.bestPlatform}` : undefined}
+        />
+        <Stat
+          label="ROI"
+          value={
+            <span className={metrics.roiPct >= 0 ? "text-steal" : "text-over"}>
+              {metrics.roiPct > 0 ? "+" : ""}
+              {metrics.roiPct}%
+            </span>
+          }
+          sub="after fees"
+        />
+        <Stat
+          label="Break-even"
+          value={formatCurrency(metrics.breakEvenSell)}
+          sub="resale price"
         />
       </div>
     </div>

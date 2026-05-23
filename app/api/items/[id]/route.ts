@@ -9,6 +9,12 @@ const patchSchema = z.object({
   askingPrice: z.number().positive().nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
   status: z.string().max(40).optional(),
+  name: z.string().min(1).max(200).optional(),
+  brand: z.string().max(120).nullable().optional(),
+  model: z.string().max(120).nullable().optional(),
+  category: z.string().max(120).nullable().optional(),
+  condition: z.string().max(120).nullable().optional(),
+  searchQuery: z.string().max(300).nullable().optional(),
 });
 
 export async function GET(
@@ -57,6 +63,12 @@ export async function PATCH(
       ...(data.askingPrice !== undefined ? { askingPrice: data.askingPrice } : {}),
       ...(data.notes !== undefined ? { notes: data.notes } : {}),
       ...(data.status !== undefined ? { status: data.status } : {}),
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.brand !== undefined ? { brand: data.brand } : {}),
+      ...(data.model !== undefined ? { model: data.model } : {}),
+      ...(data.category !== undefined ? { category: data.category } : {}),
+      ...(data.condition !== undefined ? { condition: data.condition } : {}),
+      ...(data.searchQuery !== undefined ? { searchQuery: data.searchQuery } : {}),
       ...dealUpdate,
     },
   });
