@@ -50,6 +50,11 @@ model Item {
   // Demand signal (JSON: sell-through score, days-to-sell, seasonality)
   demand            String?
 
+  // In-app price alert: notify when the estimate crosses a target.
+  alertTarget       Float?
+  alertDirection    String?   // below | above
+  alertTriggeredAt  DateTime?
+
   status            String  @default("analyzed")
   notes             String?
 
