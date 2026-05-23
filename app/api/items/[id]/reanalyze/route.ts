@@ -49,6 +49,7 @@ export async function POST(
         priceConfidence: result.aggregate.confidence,
         sampleSize: result.aggregate.sampleSize,
         marketContext: result.marketContext,
+        priceTrend: result.trend ? JSON.stringify(result.trend) : item.priceTrend,
         dealScore: result.deal.dealScore,
         verdict: result.deal.verdict,
         bestPlatform: result.deal.bestPlatform,
@@ -66,6 +67,16 @@ export async function POST(
             condition: c.condition ?? null,
             listingType: c.listingType ?? "active",
           })),
+        },
+        snapshots: {
+          create: [
+            {
+              low: result.aggregate.low,
+              median: result.aggregate.median,
+              high: result.aggregate.high,
+              sampleSize: result.aggregate.sampleSize,
+            },
+          ],
         },
       },
     });

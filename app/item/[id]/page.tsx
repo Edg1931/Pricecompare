@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, Tag, TrendingUp, Trophy } from "lucide-react";
-import { getItem, parseAttributes, parseNetProceeds } from "@/lib/item";
+import {
+  getItem,
+  parseAttributes,
+  parseNetProceeds,
+  parsePriceTrend,
+} from "@/lib/item";
 import { sourcingMetrics } from "@/lib/analysis/deal";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
@@ -9,6 +14,7 @@ import type { Verdict } from "@/lib/types";
 import { Card, VerdictBadge, ConfidenceBar, SourcingCard } from "@/components/ui";
 import { PriceGauge } from "@/components/PriceGauge";
 import { PhotoCarousel } from "@/components/PhotoCarousel";
+import { PriceHistoryCard } from "@/components/PriceHistory";
 import { CopyButton, ShareButton } from "@/components/Copyable";
 import {
   AskingPriceEditor,
@@ -36,6 +42,11 @@ export default async function ItemPage({
   const fullListing = [item.listingTitle, item.listingDescription]
     .filter(Boolean)
     .join("\n\n");
+  const priceTrend = parsePriceTrend(item.priceTrend);
+  const snapshots = item.snapshots.map((s) => ({
+    median: s.median,
+    createdAt: s.createdAt.toISOString(),
+  }));
 
   // group comps by source
   const grouped = new Map<string, typeof item.comps>();
@@ -151,6 +162,9 @@ export default async function ItemPage({
 
       {/* Sourcing / ROI */}
       {sourcing && <SourcingCard metrics={sourcing} />}
+
+      {/* Price history & trend */}
+      <PriceHistoryCard trend={priceTrend} snapshots={snapshots} />
 
       {/* Best platform + net proceeds */}
       {netProceeds.length > 0 && (

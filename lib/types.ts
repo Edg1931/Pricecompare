@@ -62,6 +62,15 @@ export interface ListingKit {
   description: string;
 }
 
+export interface PriceTrend {
+  current: number | null; // typical median sold price now
+  m3: number | null; // ~3 months ago
+  m6: number | null; // ~6 months ago
+  y1: number | null; // ~1 year ago
+  direction: "rising" | "stable" | "falling" | null;
+  note: string | null;
+}
+
 export interface SourcingMetrics {
   bestPlatform: string | null;
   bestNet: number; // take-home at median sale price, best platform

@@ -1,4 +1,4 @@
-import type { ItemIdentification, RawComp } from "@/lib/types";
+import type { ItemIdentification, PriceTrend, RawComp } from "@/lib/types";
 import { identifyItem } from "@/lib/ai/vision";
 import { researchPrices } from "@/lib/ai/research";
 import { generateListing } from "@/lib/ai/listing";
@@ -12,6 +12,7 @@ export interface AnalysisResult {
   aggregate: ReturnType<typeof aggregatePrices>;
   deal: ReturnType<typeof analyzeDeal>;
   marketContext: string | null;
+  trend: PriceTrend | null;
   listing: { title: string; description: string } | null;
 }
 
@@ -43,6 +44,7 @@ export async function priceAndAnalyze(
     aggregate,
     deal,
     marketContext: research.marketContext,
+    trend: research.trend,
     listing,
   };
 }
