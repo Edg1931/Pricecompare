@@ -47,19 +47,35 @@ model Item {
   // Estimated sold-price trend over time (JSON: current/m3/m6/y1 + direction)
   priceTrend        String?
 
+  // Demand signal (JSON: sell-through score, days-to-sell, seasonality)
+  demand            String?
+
   status            String  @default("analyzed")
   notes             String?
 
   // Flip / P&L tracking (filled in as you buy and sell)
   purchasePrice     Float?    // what you actually paid
+  boughtAt          DateTime?
   soldPrice         Float?    // actual sale price
   soldMarketplace   String?   // where it sold
+  soldFees          Float?    // actual platform fees (overrides the estimate)
   shippingCost      Float?    // shipping you paid out of pocket
   soldAt            DateTime?
 
   photos            Photo[]
   comps             Comp[]
   snapshots         PriceSnapshot[]
+}
+
+// Business expenses (mileage, supplies, etc.) for true net profit and taxes.
+model Expense {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  type        String   @default("other") // mileage | supplies | shipping | fees | other
+  description String?
+  amount      Float    @default(0)
+  miles       Float?
+  createdAt   DateTime @default(now())
 }
 
 // A point-in-time record of the estimated resale price, captured on each

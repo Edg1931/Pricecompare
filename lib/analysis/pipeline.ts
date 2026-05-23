@@ -1,4 +1,4 @@
-import type { ItemIdentification, PriceTrend, RawComp } from "@/lib/types";
+import type { Demand, ItemIdentification, PriceTrend, RawComp } from "@/lib/types";
 import { identifyItem } from "@/lib/ai/vision";
 import { researchPrices } from "@/lib/ai/research";
 import { generateListing } from "@/lib/ai/listing";
@@ -13,6 +13,7 @@ export interface AnalysisResult {
   deal: ReturnType<typeof analyzeDeal>;
   marketContext: string | null;
   trend: PriceTrend | null;
+  demand: Demand | null;
   listing: { title: string; description: string } | null;
 }
 
@@ -45,6 +46,7 @@ export async function priceAndAnalyze(
     deal,
     marketContext: research.marketContext,
     trend: research.trend,
+    demand: research.demand,
     listing,
   };
 }

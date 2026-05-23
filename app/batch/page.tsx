@@ -12,7 +12,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { fileToDataUrl } from "@/lib/image";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, readJson } from "@/lib/utils";
 import { VerdictBadge } from "@/components/ui";
 import type { Verdict } from "@/lib/types";
 
@@ -60,8 +60,7 @@ export default function BatchPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ images: [job.src], askingPrice: null }),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Analysis failed");
+        const data = await readJson(res);
 
         let name: string | undefined;
         let verdict: string | null = null;
@@ -77,7 +76,13 @@ export default function BatchPage() {
         } catch {
           // detail fetch is best-effort; the item was still created
         }
-        update(job.id, { status: "done", itemId: data.id, name, verdict, median });
+        update(job.id, {
+          status: "done",
+          itemId: data.id as string,
+          name,
+          verdict,
+          median,
+        });
       } catch (err) {
         update(job.id, {
           status: "error",

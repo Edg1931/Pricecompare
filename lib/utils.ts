@@ -30,3 +30,30 @@ export function timeAgo(date: Date | string) {
   }
   return "just now";
 }
+
+/**
+ * Reads a fetch Response as JSON, turning non-OK and non-JSON responses
+ * (e.g. Vercel's plain-text "Request Entity Too Large") into clear errors.
+ */
+export async function readJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  if (!res.ok) {
+    let message = `Request failed (${res.status}).`;
+    try {
+      const j = JSON.parse(text) as { error?: string };
+      if (j?.error) message = j.error;
+    } catch {
+      if (res.status === 413) {
+        message = "That photo is too large to upload. Try a smaller image.";
+      } else if (text) {
+        message = text.slice(0, 140);
+      }
+    }
+    throw new Error(message);
+  }
+  try {
+    return text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    throw new Error("Unexpected response from the server.");
+  }
+}

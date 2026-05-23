@@ -50,6 +50,7 @@ export async function POST(
         sampleSize: result.aggregate.sampleSize,
         marketContext: result.marketContext,
         priceTrend: result.trend ? JSON.stringify(result.trend) : item.priceTrend,
+        demand: result.demand ? JSON.stringify(result.demand) : item.demand,
         dealScore: result.deal.dealScore,
         verdict: result.deal.verdict,
         bestPlatform: result.deal.bestPlatform,
