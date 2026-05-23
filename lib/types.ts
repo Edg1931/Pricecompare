@@ -71,6 +71,19 @@ export interface PriceTrend {
   note: string | null;
 }
 
+export interface Demand {
+  sellThroughScore: number | null; // 0..100, how likely/quickly it sells
+  daysToSell: string | null; // e.g. "1-2 weeks"
+  seasonality: string | null; // best time of year to sell
+  note: string | null; // short demand summary
+}
+
+export interface Negotiation {
+  maxBuy: number; // pay under this for a healthy flip
+  opening: number; // suggested opening offer
+  script: string; // a line to use with the seller
+}
+
 export interface SourcingMetrics {
   bestPlatform: string | null;
   bestNet: number; // take-home at median sale price, best platform

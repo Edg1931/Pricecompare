@@ -1,13 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, Tag, TrendingUp, Trophy } from "lucide-react";
+import {
+  ArrowLeft,
+  ExternalLink,
+  Tag,
+  TrendingUp,
+  Trophy,
+  Handshake,
+} from "lucide-react";
 import {
   getItem,
   parseAttributes,
   parseNetProceeds,
   parsePriceTrend,
+  parseDemand,
 } from "@/lib/item";
-import { sourcingMetrics } from "@/lib/analysis/deal";
+import { sourcingMetrics, negotiation } from "@/lib/analysis/deal";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
 import { marketplaceLinks } from "@/lib/marketplaces";
@@ -18,6 +26,7 @@ import {
   StatusBadge,
   ConfidenceBar,
   SourcingCard,
+  DemandCard,
 } from "@/components/ui";
 import { PriceGauge } from "@/components/PriceGauge";
 import { PhotoCarousel } from "@/components/PhotoCarousel";
@@ -57,6 +66,13 @@ export default async function ItemPage({
     createdAt: s.createdAt.toISOString(),
   }));
   const market = marketplaceLinks(item.searchQuery ?? item.name);
+  const demand = parseDemand(item.demand);
+  const neg =
+    item.soldPrice == null &&
+    item.status !== "bought" &&
+    item.status !== "listed"
+      ? negotiation(item.recommendedMedian, item.askingPrice)
+      : null;
 
   // group comps by source
   const grouped = new Map<string, typeof item.comps>();
@@ -187,6 +203,44 @@ export default async function ItemPage({
 
       {/* Sourcing / ROI */}
       {sourcing && <SourcingCard metrics={sourcing} />}
+
+      {/* Negotiation assistant */}
+      {neg && (
+        <Card className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Handshake className="h-4 w-4 text-accent" />
+            <h2 className="font-semibold">Negotiation assistant</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-border bg-surface-2/50 px-4 py-3">
+              <div className="text-xs uppercase tracking-wide text-muted">
+                Opening offer
+              </div>
+              <div className="mt-0.5 text-xl font-semibold tabular-nums">
+                {formatCurrency(neg.opening)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-surface-2/50 px-4 py-3">
+              <div className="text-xs uppercase tracking-wide text-muted">
+                Walk-away max
+              </div>
+              <div className="mt-0.5 text-xl font-semibold tabular-nums">
+                {formatCurrency(neg.maxBuy)}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-lg bg-surface-2 px-3 py-2">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs uppercase tracking-wide text-muted">Script</span>
+              <CopyButton text={neg.script} />
+            </div>
+            <p className="text-sm leading-relaxed text-fg/90">{neg.script}</p>
+          </div>
+        </Card>
+      )}
+
+      {/* Demand & sell-through */}
+      {demand && <DemandCard demand={demand} />}
 
       {/* Price history & trend */}
       <PriceHistoryCard trend={priceTrend} snapshots={snapshots} />

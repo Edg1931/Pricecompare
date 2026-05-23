@@ -1,10 +1,33 @@
 import type {
   DealAnalysis,
+  Negotiation,
   PlatformNet,
   SourcingMetrics,
   Verdict,
 } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
+
+/**
+ * Suggests a buying ceiling, an opening offer, and a script for negotiating a
+ * purchase, based on the market median and the seller's asking price.
+ */
+export function negotiation(
+  median: number | null,
+  askingPrice: number | null
+): Negotiation | null {
+  if (!median) return null;
+  const round5 = (n: number) => Math.max(1, Math.round(n / 5) * 5);
+  const maxBuy = round5(median * 0.6);
+  let opening = round5(median * 0.45);
+  if (askingPrice != null) opening = Math.min(opening, round5(askingPrice * 0.8));
+  opening = Math.min(opening, maxBuy);
+  const script = `These tend to sell for around ${formatCurrency(
+    median
+  )}. After fees and the work to resell it, I could do ${formatCurrency(
+    opening
+  )} today — would that work?`;
+  return { maxBuy, opening, script };
+}
 
 /** Approximate seller fee models per platform (estimates; fees change over time). */
 const PLATFORM_FEES: { platform: string; pct: number; fixed: number }[] = [

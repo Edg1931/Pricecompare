@@ -205,11 +205,18 @@ export default async function InventoryPage() {
                 {holding.map((item) => {
                   const cost = item.purchasePrice ?? item.askingPrice ?? null;
                   const projected = parseNetProceeds(item.netProceeds)[0]?.net ?? null;
+                  const ageDays = Math.floor(
+                    (now.getTime() - (item.boughtAt ?? item.createdAt).getTime()) /
+                      86400000
+                  );
+                  const aging = ageDays >= 60;
                   return (
                     <Link
                       key={item.id}
                       href={`/item/${item.id}`}
-                      className="flex items-center gap-3 rounded-xl border border-border bg-surface/70 p-2.5 transition hover:border-brand/60"
+                      className={`flex items-center gap-3 rounded-xl border bg-surface/70 p-2.5 transition hover:border-brand/60 ${
+                        aging ? "border-over/40" : "border-border"
+                      }`}
                     >
                       <Thumb url={item.photos[0]?.url} name={item.name} />
                       <div className="min-w-0 flex-1">
@@ -219,11 +226,19 @@ export default async function InventoryPage() {
                           {projected != null && cost != null && (
                             <> · est. profit {formatCurrency(projected - cost)}</>
                           )}
+                          {" · held "}
+                          {ageDays}d
                         </p>
                       </div>
-                      <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium capitalize text-muted">
-                        {item.status}
-                      </span>
+                      {aging ? (
+                        <span className="rounded-full bg-over/15 px-2.5 py-1 text-xs font-semibold text-over">
+                          Consider markdown
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium capitalize text-muted">
+                          {item.status}
+                        </span>
+                      )}
                       <ArrowRight className="h-4 w-4 shrink-0 text-muted" />
                     </Link>
                   );

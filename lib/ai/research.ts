@@ -1,5 +1,6 @@
 import type {
   CompSource,
+  Demand,
   ItemIdentification,
   PriceTrend,
   RawComp,
@@ -10,6 +11,29 @@ export interface ResearchResult {
   comps: RawComp[];
   marketContext: string | null;
   trend: PriceTrend | null;
+  demand: Demand | null;
+}
+
+function parseDemand(obj: unknown): Demand | null {
+  if (!obj || typeof obj !== "object") return null;
+  const d = obj as Record<string, unknown>;
+  const score = Number(d.sellThroughScore);
+  const demand: Demand = {
+    sellThroughScore:
+      Number.isFinite(score) && score >= 0 ? Math.min(100, Math.round(score)) : null,
+    daysToSell: typeof d.daysToSell === "string" ? d.daysToSell : null,
+    seasonality: typeof d.seasonality === "string" ? d.seasonality : null,
+    note: typeof d.note === "string" ? d.note : null,
+  };
+  if (
+    demand.sellThroughScore == null &&
+    !demand.daysToSell &&
+    !demand.seasonality &&
+    !demand.note
+  ) {
+    return null;
+  }
+  return demand;
 }
 
 function parseTrend(obj: unknown): PriceTrend | null {
@@ -94,6 +118,8 @@ Use web search to find comparable listings and recent sold prices across eBay, E
 
 Also estimate how this item's resale value has trended over time. Based on sold listings and demand, estimate the typical median SOLD price now, ~3 months ago, ~6 months ago, and ~1 year ago. These are best-effort estimates.
 
+Also assess demand: how quickly and reliably this item sells (sell-through), a realistic time-to-sell range, and whether there's a best time of year to sell it for top dollar.
+
 After researching, respond with ONLY a JSON object in a \`\`\`json code block, in this exact shape:
 {
   "marketContext": "1-2 sentence summary of demand, typical price range, and how confident you are.",
@@ -105,12 +131,18 @@ After researching, respond with ONLY a JSON object in a \`\`\`json code block, i
     "direction": "rising|stable|falling",
     "note": "1 sentence on whether demand/price is rising or falling and why."
   },
+  "demand": {
+    "sellThroughScore": 0-100 (higher = sells faster/more reliably),
+    "daysToSell": "realistic time-to-sell range, e.g. '1-2 weeks'",
+    "seasonality": "best time of year to sell, or 'year-round'",
+    "note": "1 sentence on demand and how easy it is to sell."
+  },
   "comps": [
     { "source": "ebay|etsy|mercari|facebook|swappa|poshmark|stockx|web", "title": "listing title", "price": 123.45, "url": "https://...", "condition": "New|Used|...", "listingType": "active|sold" }
   ]
 }
 
-For the trend, use null for any window you genuinely cannot estimate. Include 5-15 of the most relevant comps with real prices in USD. Only include comps you actually found.`;
+For the trend and demand, use null for anything you genuinely cannot estimate. Include 5-15 of the most relevant comps with real prices in USD. Only include comps you actually found.`;
 
   const response = await anthropic.messages.create({
     model: MODEL,
@@ -131,11 +163,16 @@ For the trend, use null for any window you genuinely cannot estimate. Include 5-
     .join("\n");
 
   const parsed = extractJsonBlock(text) as
-    | { marketContext?: string; comps?: unknown[]; trend?: unknown }
+    | { marketContext?: string; comps?: unknown[]; trend?: unknown; demand?: unknown }
     | null;
 
   if (!parsed || !Array.isArray(parsed.comps)) {
-    return { comps: [], marketContext: null, trend: parseTrend(parsed?.trend) };
+    return {
+      comps: [],
+      marketContext: null,
+      trend: parseTrend(parsed?.trend),
+      demand: parseDemand(parsed?.demand),
+    };
   }
 
   const comps: RawComp[] = [];
@@ -163,5 +200,6 @@ For the trend, use null for any window you genuinely cannot estimate. Include 5-
     marketContext:
       typeof parsed.marketContext === "string" ? parsed.marketContext : null,
     trend: parseTrend(parsed.trend),
+    demand: parseDemand(parsed.demand),
   };
 }

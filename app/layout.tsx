@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
-import { ScanLine, LayoutGrid, Images, Wallet } from "lucide-react";
+import { ScanLine, LayoutGrid, Images, Wallet, Layers } from "lucide-react";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -42,19 +42,27 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 href="/"
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
               >
-                <LayoutGrid className="h-4 w-4" /> Library
+                <LayoutGrid className="h-4 w-4" />{" "}
+                <span className="hidden sm:inline">Library</span>
               </Link>
               <Link
                 href="/batch"
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
               >
-                <Images className="h-4 w-4" /> Bulk
+                <Images className="h-4 w-4" /> <span className="hidden sm:inline">Bulk</span>
+              </Link>
+              <Link
+                href="/lot"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
+              >
+                <Layers className="h-4 w-4" /> <span className="hidden sm:inline">Lot</span>
               </Link>
               <Link
                 href="/inventory"
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
               >
-                <Wallet className="h-4 w-4" /> Inventory
+                <Wallet className="h-4 w-4" />{" "}
+                <span className="hidden sm:inline">Inventory</span>
               </Link>
               <Link
                 href="/scan"

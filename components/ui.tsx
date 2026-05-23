@@ -1,7 +1,73 @@
 import { cn, formatCurrency } from "@/lib/utils";
 import { VERDICT_META, statusMeta } from "@/lib/display";
-import type { SourcingMetrics, Verdict } from "@/lib/types";
-import { TrendingUp } from "lucide-react";
+import type { Demand, SourcingMetrics, Verdict } from "@/lib/types";
+import { TrendingUp, Gauge, CalendarClock, Clock } from "lucide-react";
+
+export function DemandCard({ demand }: { demand: Demand }) {
+  const score = demand.sellThroughScore;
+  const tone =
+    score == null
+      ? "text-muted"
+      : score >= 67
+        ? "text-steal"
+        : score >= 34
+          ? "text-fair"
+          : "text-over";
+  const label =
+    score == null
+      ? "Unknown"
+      : score >= 67
+        ? "Sells fast"
+        : score >= 34
+          ? "Moderate"
+          : "Slow mover";
+  return (
+    <div className="rounded-2xl border border-border bg-surface/70 p-5 backdrop-blur-sm">
+      <div className="mb-3 flex items-center gap-2">
+        <Gauge className="h-4 w-4 text-brand" />
+        <h2 className="font-semibold">Demand &amp; sell-through</h2>
+        <span className={cn("ml-auto text-sm font-semibold", tone)}>{label}</span>
+      </div>
+      {score != null && (
+        <div className="mb-3">
+          <div className="mb-1 flex items-center justify-between text-xs text-muted">
+            <span>Sell-through</span>
+            <span className="font-medium text-fg">{score}/100</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-brand to-accent"
+              style={{ width: `${score}%` }}
+            />
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        {demand.daysToSell && (
+          <div className="flex items-center gap-2 text-sm">
+            <Clock className="h-4 w-4 text-muted" />
+            <div>
+              <div className="text-xs text-muted">Time to sell</div>
+              <div className="font-medium">{demand.daysToSell}</div>
+            </div>
+          </div>
+        )}
+        {demand.seasonality && (
+          <div className="flex items-center gap-2 text-sm">
+            <CalendarClock className="h-4 w-4 text-muted" />
+            <div>
+              <div className="text-xs text-muted">Best time to sell</div>
+              <div className="font-medium">{demand.seasonality}</div>
+            </div>
+          </div>
+        )}
+      </div>
+      {demand.note && (
+        <p className="mt-3 text-sm leading-relaxed text-fg/90">{demand.note}</p>
+      )}
+    </div>
+  );
+}
 
 export function StatusBadge({
   status,

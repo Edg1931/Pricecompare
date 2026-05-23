@@ -49,6 +49,12 @@ export async function PATCH(
   }
   const data = parsed.data;
 
+  // Stamp the purchase date the first time an item is marked bought.
+  let boughtAtUpdate = {};
+  if (data.status === "bought" && !existing.boughtAt) {
+    boughtAtUpdate = { boughtAt: new Date() };
+  }
+
   // Stamp/clear the sale date when the sold price is set or removed.
   let soldAtUpdate = {};
   if (data.soldPrice !== undefined) {
@@ -89,6 +95,7 @@ export async function PATCH(
       ...(data.soldFees !== undefined ? { soldFees: data.soldFees } : {}),
       ...(data.shippingCost !== undefined ? { shippingCost: data.shippingCost } : {}),
       ...(data.soldPrice !== undefined ? { soldPrice: data.soldPrice } : {}),
+      ...boughtAtUpdate,
       ...soldAtUpdate,
       ...dealUpdate,
     },
