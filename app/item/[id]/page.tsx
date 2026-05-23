@@ -10,6 +10,7 @@ import {
 import { sourcingMetrics } from "@/lib/analysis/deal";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
+import { marketplaceLinks } from "@/lib/marketplaces";
 import type { Verdict } from "@/lib/types";
 import {
   Card,
@@ -55,6 +56,7 @@ export default async function ItemPage({
     median: s.median,
     createdAt: s.createdAt.toISOString(),
   }));
+  const market = marketplaceLinks(item.searchQuery ?? item.name);
 
   // group comps by source
   const grouped = new Map<string, typeof item.comps>();
@@ -318,6 +320,32 @@ export default async function ItemPage({
           </div>
         )}
       </Card>
+
+      {/* Check the market */}
+      {market.length > 0 && (
+        <Card className="p-5">
+          <h2 className="mb-1 font-semibold">Check the market yourself</h2>
+          <p className="mb-3 text-sm text-muted">
+            Open a live search for &ldquo;{item.searchQuery ?? item.name}&rdquo; to
+            verify prices or list it.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {market.map((m) => (
+              <a
+                key={m.label}
+                href={m.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm font-medium transition hover:border-brand hover:text-brand"
+              >
+                <span className={`h-2 w-2 rounded-full ${m.dot}`} />
+                {m.label}
+                <ExternalLink className="h-3.5 w-3.5 text-muted" />
+              </a>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Notes */}
       <Card className="p-5">
