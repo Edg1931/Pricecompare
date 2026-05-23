@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Item {
+  id                String   @id @default(cuid())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Identification (from Claude vision)
+  name              String
+  brand             String?
+  model             String?
+  category          String?
+  condition         String?
+  attributes        String? // JSON array of {label, value}
+  identConfidence   Float? // 0..1
+  identNotes        String?
+  searchQuery       String?
+
+  // Pricing (aggregated from eBay + web research)
+  recommendedLow    Float?
+  recommendedMedian Float?
+  recommendedHigh   Float?
+  priceConfidence   Float? // 0..1
+  sampleSize        Int     @default(0)
+  marketContext     String?
+
+  // Deal analysis
+  askingPrice       Float?
+  dealScore         Int? // 0..100
+  verdict           String? // STEAL | GOOD | FAIR | OVERPRICED
+  bestPlatform      String?
+  netProceeds       String? // JSON array of {platform, net, feePct}
+  analysisSummary   String?
+
+  // Listing kit (Claude generated)
+  listingTitle      String?
+  listingDescription String?
+
+  status            String  @default("analyzed")
+  notes             String?
+
+  photos            Photo[]
+  comps             Comp[]
+}
+
+model Photo {
+  id        String   @id @default(cuid())
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  url       String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Comp {
+  id          String   @id @default(cuid())
+  itemId      String
+  item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  source      String // ebay | etsy | mercari | facebook | swappa | poshmark | stockx | web
+  title       String
+  price       Float
+  currency    String   @default("USD")
+  url         String?
+  condition   String?
+  listingType String   @default("active") // active | sold
+  capturedAt  DateTime @default(now())
+
+  @@index([itemId])
+}

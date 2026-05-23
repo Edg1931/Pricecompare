@@ -1,0 +1,277 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, ExternalLink, Tag, TrendingUp, Trophy } from "lucide-react";
+import { getItem, parseAttributes, parseNetProceeds } from "@/lib/item";
+import { formatCurrency } from "@/lib/utils";
+import { sourceMeta } from "@/lib/display";
+import type { Verdict } from "@/lib/types";
+import { Card, VerdictBadge, ConfidenceBar } from "@/components/ui";
+import { PriceGauge } from "@/components/PriceGauge";
+import { PhotoCarousel } from "@/components/PhotoCarousel";
+import { CopyButton } from "@/components/Copyable";
+import { AskingPriceEditor, ItemActions } from "@/components/ItemControls";
+
+export default async function ItemPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const item = await getItem(id);
+  if (!item) notFound();
+
+  const attributes = parseAttributes(item.attributes);
+  const netProceeds = parseNetProceeds(item.netProceeds);
+  const subtitle = [item.brand, item.model].filter(Boolean).join(" · ");
+
+  // group comps by source
+  const grouped = new Map<string, typeof item.comps>();
+  for (const c of item.comps) {
+    const arr = grouped.get(c.source) ?? [];
+    arr.push(c);
+    grouped.set(c.source, arr);
+  }
+
+  return (
+    <div className="space-y-6">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1.5 text-sm text-muted transition hover:text-fg"
+      >
+        <ArrowLeft className="h-4 w-4" /> Library
+      </Link>
+
+      <div className="grid gap-6 md:grid-cols-[minmax(0,360px)_1fr]">
+        {/* Left: photos */}
+        <div className="space-y-4">
+          <PhotoCarousel photos={item.photos} />
+          <ItemActions itemId={item.id} />
+        </div>
+
+        {/* Right: details */}
+        <div className="space-y-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <VerdictBadge verdict={item.verdict as Verdict | null} />
+              {item.category && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-1 text-xs text-muted">
+                  <Tag className="h-3 w-3" /> {item.category}
+                </span>
+              )}
+              {item.condition && (
+                <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-muted">
+                  {item.condition}
+                </span>
+              )}
+            </div>
+            <h1 className="mt-2 text-2xl font-bold leading-tight tracking-tight">
+              {item.name}
+            </h1>
+            {subtitle && <p className="text-muted">{subtitle}</p>}
+          </div>
+
+          {/* Deal hero */}
+          <Card className="p-5">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted">
+                  Asking price
+                </div>
+                <AskingPriceEditor itemId={item.id} initial={item.askingPrice} />
+              </div>
+              {item.dealScore !== null && (
+                <div className="text-right">
+                  <div className="text-xs uppercase tracking-wide text-muted">
+                    Deal score
+                  </div>
+                  <div className="text-3xl font-bold tabular-nums">
+                    {item.dealScore}
+                    <span className="text-base text-muted">/100</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {item.recommendedMedian !== null && (
+              <div className="mt-5">
+                <PriceGauge
+                  low={item.recommendedLow}
+                  median={item.recommendedMedian}
+                  high={item.recommendedHigh}
+                  asking={item.askingPrice}
+                />
+              </div>
+            )}
+
+            {item.analysisSummary && (
+              <p className="mt-4 text-sm leading-relaxed text-fg/90">
+                {item.analysisSummary}
+              </p>
+            )}
+          </Card>
+
+          {/* Confidence */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="p-4">
+              <ConfidenceBar value={item.identConfidence} label="ID confidence" />
+            </Card>
+            <Card className="p-4">
+              <ConfidenceBar value={item.priceConfidence} label="Price confidence" />
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* Best platform + net proceeds */}
+      {netProceeds.length > 0 && (
+        <Card className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-fair" />
+            <h2 className="font-semibold">Where to sell it</h2>
+            {item.bestPlatform && (
+              <span className="ml-auto rounded-full bg-steal/15 px-2.5 py-1 text-xs font-semibold text-steal">
+                Best: {item.bestPlatform}
+              </span>
+            )}
+          </div>
+          <p className="mb-4 text-xs text-muted">
+            Estimated take-home at the median resale price of{" "}
+            {formatCurrency(item.recommendedMedian)} (after typical seller fees).
+          </p>
+          <div className="space-y-2">
+            {netProceeds.map((p) => {
+              const max = netProceeds[0].net || 1;
+              return (
+                <div key={p.platform} className="flex items-center gap-3">
+                  <div className="w-40 shrink-0 text-sm">{p.platform}</div>
+                  <div className="h-6 flex-1 overflow-hidden rounded-md bg-surface-2">
+                    <div
+                      className="h-full rounded-md bg-gradient-to-r from-brand/70 to-accent/70"
+                      style={{ width: `${Math.max(8, (p.net / max) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums">
+                    {formatCurrency(p.net)}
+                  </div>
+                  <div className="hidden w-14 shrink-0 text-right text-xs text-muted sm:block">
+                    {Math.round(p.feePct * 100)}% fee
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* Listing kit */}
+      {(item.listingTitle || item.listingDescription) && (
+        <Card className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-accent" />
+            <h2 className="font-semibold">Ready-to-post listing</h2>
+          </div>
+          {item.listingTitle && (
+            <div className="mb-3">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs uppercase tracking-wide text-muted">Title</span>
+                <CopyButton text={item.listingTitle} />
+              </div>
+              <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-medium">
+                {item.listingTitle}
+              </p>
+            </div>
+          )}
+          {item.listingDescription && (
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs uppercase tracking-wide text-muted">
+                  Description
+                </span>
+                <CopyButton text={item.listingDescription} />
+              </div>
+              <p className="whitespace-pre-wrap rounded-lg bg-surface-2 px-3 py-2 text-sm leading-relaxed text-fg/90">
+                {item.listingDescription}
+              </p>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Comparable listings */}
+      <Card className="p-5">
+        <h2 className="mb-1 font-semibold">
+          Comparable listings{" "}
+          <span className="text-muted">({item.comps.length})</span>
+        </h2>
+        {item.marketContext && (
+          <p className="mb-4 text-sm text-muted">{item.marketContext}</p>
+        )}
+        {item.comps.length === 0 ? (
+          <p className="text-sm text-muted">
+            No comparable listings found. Try re-analyzing or add a hint.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {[...grouped.entries()].map(([source, comps]) => {
+              const meta = sourceMeta(source);
+              return (
+                <div key={source}>
+                  <div className="mb-1.5 flex items-center gap-2 text-sm font-medium">
+                    <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
+                    {meta.label}
+                    <span className="text-xs text-muted">({comps.length})</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {comps.map((c) => (
+                      <div
+                        key={c.id}
+                        className="flex items-center gap-3 rounded-lg border border-border bg-surface-2/40 px-3 py-2"
+                      >
+                        <span className="font-semibold tabular-nums">
+                          {formatCurrency(c.price, c.currency)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-muted">
+                          {c.title}
+                        </span>
+                        {c.listingType === "sold" && (
+                          <span className="rounded bg-steal/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-steal">
+                            sold
+                          </span>
+                        )}
+                        {c.url && (
+                          <a
+                            href={c.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted transition hover:text-brand"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      {/* Attributes */}
+      {attributes.length > 0 && (
+        <Card className="p-5">
+          <h2 className="mb-3 font-semibold">Details</h2>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+            {attributes.map((a, i) => (
+              <div key={i}>
+                <dt className="text-xs uppercase tracking-wide text-muted">{a.label}</dt>
+                <dd className="font-medium">{a.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
+      )}
+    </div>
+  );
+}
