@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Package, Search, TrendingUp } from "lucide-react";
+import { Download, Package, Search, TrendingUp } from "lucide-react";
 import { formatCurrency, timeAgo } from "@/lib/utils";
-import { VerdictBadge } from "@/components/ui";
+import { VerdictBadge, StatusBadge } from "@/components/ui";
+import { STATUS_OPTIONS, statusMeta } from "@/lib/display";
 import type { Verdict } from "@/lib/types";
 
 export interface LibItem {
@@ -14,12 +15,56 @@ export interface LibItem {
   model: string | null;
   category: string | null;
   verdict: string | null;
+  status: string | null;
   recommendedMedian: number | null;
   dealScore: number | null;
   askingPrice: number | null;
   profit: number | null;
   createdAt: string;
   photoUrl: string | null;
+}
+
+function downloadCsv(items: LibItem[]) {
+  const headers = [
+    "Name",
+    "Brand",
+    "Model",
+    "Category",
+    "Verdict",
+    "Status",
+    "Asking",
+    "Est. median",
+    "Est. profit",
+    "Added",
+  ];
+  const esc = (v: string | number | null) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const rows = items.map((it) =>
+    [
+      it.name,
+      it.brand,
+      it.model,
+      it.category,
+      it.verdict,
+      statusMeta(it.status).label,
+      it.askingPrice,
+      it.recommendedMedian,
+      it.profit != null ? Math.round(it.profit * 100) / 100 : null,
+      new Date(it.createdAt).toISOString().slice(0, 10),
+    ]
+      .map(esc)
+      .join(",")
+  );
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `reseller-library-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 const VERDICT_FILTERS = ["All", "STEAL", "GOOD", "FAIR", "OVERPRICED"] as const;
@@ -44,12 +89,14 @@ const FILTER_LABEL: Record<VerdictFilter, string> = {
 export function LibraryBrowser({ items }: { items: LibItem[] }) {
   const [query, setQuery] = useState("");
   const [verdict, setVerdict] = useState<VerdictFilter>("All");
+  const [status, setStatus] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     let out = items.filter((it) => {
       if (verdict !== "All" && it.verdict !== verdict) return false;
+      if (status !== "all" && (it.status ?? "analyzed") !== status) return false;
       if (!q) return true;
       return [it.name, it.brand, it.model, it.category]
         .filter(Boolean)
@@ -70,13 +117,21 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
       }
     });
     return out;
-  }, [items, query, verdict, sort]);
+  }, [items, query, verdict, status, sort]);
 
   return (
     <div>
       <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
         <Package className="h-5 w-5 text-muted" /> Your library
         <span className="text-sm font-normal text-muted">({items.length})</span>
+        {items.length > 0 && (
+          <button
+            onClick={() => downloadCsv(visible)}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted transition hover:text-fg"
+          >
+            <Download className="h-3.5 w-3.5" /> Export CSV
+          </button>
+        )}
       </h2>
 
       {items.length > 0 && (
@@ -106,9 +161,21 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
               </button>
             ))}
             <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="ml-auto rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-muted outline-none"
+            >
+              <option value="all">Status: All</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {statusMeta(s).label}
+                </option>
+              ))}
+            </select>
+            <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
-              className="ml-auto rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-muted outline-none"
+              className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-muted outline-none"
             >
               {Object.entries(SORTS).map(([key, label]) => (
                 <option key={key} value={key}>
@@ -157,7 +224,10 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
                 )}
               </div>
               <div className="space-y-1.5 p-3">
-                <VerdictBadge verdict={item.verdict as Verdict | null} />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <VerdictBadge verdict={item.verdict as Verdict | null} />
+                  <StatusBadge status={item.status} />
+                </div>
                 <p className="line-clamp-1 text-sm font-medium">{item.name}</p>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted">{timeAgo(new Date(item.createdAt))}</span>
