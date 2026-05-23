@@ -13,7 +13,7 @@ import {
   Layers,
 } from "lucide-react";
 import { fileToDataUrl } from "@/lib/image";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, readJson } from "@/lib/utils";
 import { VerdictBadge } from "@/components/ui";
 import type { ItemIdentification, Verdict } from "@/lib/types";
 
@@ -56,9 +56,8 @@ export default function LotPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ images, hint: hint.trim() || undefined }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Identification failed");
-      const detected: ItemIdentification[] = data.items ?? [];
+      const data = await readJson(res);
+      const detected = (data.items as ItemIdentification[]) ?? [];
       if (detected.length === 0) {
         setError("No resellable items were detected. Try a clearer photo.");
       }
@@ -93,8 +92,7 @@ export default function LotPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ images, identification: it.ident }),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Pricing failed");
+        const data = await readJson(res);
 
         let verdict: string | null = null;
         let median: number | null = null;
@@ -108,7 +106,7 @@ export default function LotPage() {
         } catch {
           // detail fetch is best-effort
         }
-        update(it.id, { status: "done", itemId: data.id, verdict, median });
+        update(it.id, { status: "done", itemId: data.id as string, verdict, median });
       } catch (err) {
         update(it.id, {
           status: "error",

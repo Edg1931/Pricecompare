@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, X, Sparkles, Loader2, ScanBarcode } from "lucide-react";
-import { fileToDataUrl } from "@/lib/image";
+import { fileToDataUrl, dataUrlBytes } from "@/lib/image";
+import { readJson } from "@/lib/utils";
 import { BarcodeScanner, isBarcodeSupported } from "@/components/BarcodeScanner";
 import { VoiceInput } from "@/components/VoiceInput";
 
@@ -40,6 +41,11 @@ export default function ScanPage() {
 
   async function analyze() {
     if (images.length === 0) return;
+    const totalBytes = images.reduce((sum, src) => sum + dataUrlBytes(src), 0);
+    if (totalBytes > 4_000_000) {
+      setError("These photos are too large together — try fewer photos.");
+      return;
+    }
     setLoading(true);
     setStage(0);
     setError(null);
@@ -53,9 +59,8 @@ export default function ScanPage() {
           hint: hint.trim() || undefined,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Analysis failed");
-      router.push(`/item/${data.id}`);
+      const data = await readJson(res);
+      router.push(`/item/${data.id as string}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
