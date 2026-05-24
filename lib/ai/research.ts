@@ -142,7 +142,14 @@ After researching, respond with ONLY a JSON object in a \`\`\`json code block, i
   ]
 }
 
-For the trend and demand, use null for anything you genuinely cannot estimate. Include 5-15 of the most relevant comps with real prices in USD. Only include comps you actually found.`;
+For the trend and demand, use null for anything you genuinely cannot estimate. Include 5-15 of the most relevant comps with real prices in USD. Only include comps you actually found.
+
+CRITICAL accuracy rules for comps:
+- The "price" MUST be the exact price shown on the page at "url" — never an approximation, rounded guess, or a price from a different listing.
+- "url" must link to that specific individual listing, NOT a search results page, category page, or store homepage.
+- If you cannot tie an exact price to a specific listing URL, set "url" to null rather than guessing — a comp with no link is better than a link whose price doesn't match.
+- For "sold" comps: only include a "url" if that exact sold price is actually viewable at that URL. eBay/marketplace sold items are often relisted at different prices, so if the link would show a different (active) price, set "url" to null.
+- Prefer fewer, verifiable comps over many uncertain ones.`;
 
   const response = await anthropic.messages.create({
     model: MODEL,

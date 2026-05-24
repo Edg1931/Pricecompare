@@ -2,7 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Download, Package, Search, TrendingUp } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Download,
+  Package,
+  Search,
+  TrendingUp,
+  CheckSquare,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
 import { formatCurrency, timeAgo } from "@/lib/utils";
 import { VerdictBadge, StatusBadge } from "@/components/ui";
 import { STATUS_OPTIONS, statusMeta } from "@/lib/display";
@@ -87,10 +97,55 @@ const FILTER_LABEL: Record<VerdictFilter, string> = {
 };
 
 export function LibraryBrowser({ items }: { items: LibItem[] }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [verdict, setVerdict] = useState<VerdictFilter>("All");
   const [status, setStatus] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelect() {
+    setSelected(new Set());
+    setSelectMode(false);
+  }
+
+  async function applyStatus(newStatus: string) {
+    setBusy(true);
+    await Promise.all(
+      [...selected].map((id) =>
+        fetch(`/api/items/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        })
+      )
+    );
+    setBusy(false);
+    exitSelect();
+    router.refresh();
+  }
+
+  async function deleteSelected() {
+    if (!confirm(`Delete ${selected.size} item${selected.size === 1 ? "" : "s"}?`)) return;
+    setBusy(true);
+    await Promise.all(
+      [...selected].map((id) => fetch(`/api/items/${id}`, { method: "DELETE" }))
+    );
+    setBusy(false);
+    exitSelect();
+    router.refresh();
+  }
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -125,14 +180,56 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
         <Package className="h-5 w-5 text-muted" /> Your library
         <span className="text-sm font-normal text-muted">({items.length})</span>
         {items.length > 0 && (
-          <button
-            onClick={() => downloadCsv(visible)}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted transition hover:text-fg"
-          >
-            <Download className="h-3.5 w-3.5" /> Export CSV
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted transition hover:text-fg"
+            >
+              {selectMode ? <X className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
+              {selectMode ? "Cancel" : "Select"}
+            </button>
+            <button
+              onClick={() => downloadCsv(visible)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted transition hover:text-fg"
+            >
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </button>
+          </div>
         )}
       </h2>
+
+      {selectMode && selected.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-2.5">
+          <span className="px-1 text-sm font-medium">{selected.size} selected</span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <select
+              disabled={busy}
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) applyStatus(e.target.value);
+                e.target.value = "";
+              }}
+              className="rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted outline-none disabled:opacity-50"
+            >
+              <option value="" disabled>
+                Set status…
+              </option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {statusMeta(s).label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={deleteSelected}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted transition hover:text-over disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+          </div>
+        </div>
+      )}
 
       {items.length > 0 && (
         <div className="mb-4 space-y-3">
@@ -203,43 +300,74 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {visible.map((item) => (
-            <Link
-              key={item.id}
-              href={`/item/${item.id}`}
-              className="group overflow-hidden rounded-2xl border border-border bg-surface/70 transition hover:border-brand/60"
-            >
-              <div className="aspect-square overflow-hidden bg-surface-2">
-                {item.photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.photoUrl}
-                    alt={item.name}
-                    className="h-full w-full object-cover transition group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="grid h-full place-items-center text-muted">
-                    <Package className="h-8 w-8" />
+          {visible.map((item) => {
+            const inner = (
+              <>
+                <div className="aspect-square overflow-hidden bg-surface-2">
+                  {item.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.photoUrl}
+                      alt={item.name}
+                      className="h-full w-full object-cover transition group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="grid h-full place-items-center text-muted">
+                      <Package className="h-8 w-8" />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1.5 p-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <VerdictBadge verdict={item.verdict as Verdict | null} />
+                    <StatusBadge status={item.status} />
                   </div>
-                )}
-              </div>
-              <div className="space-y-1.5 p-3">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <VerdictBadge verdict={item.verdict as Verdict | null} />
-                  <StatusBadge status={item.status} />
+                  <p className="line-clamp-1 text-sm font-medium">{item.name}</p>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted">{timeAgo(new Date(item.createdAt))}</span>
+                    <span className="font-semibold tabular-nums">
+                      {item.recommendedMedian !== null
+                        ? formatCurrency(item.recommendedMedian)
+                        : "—"}
+                    </span>
+                  </div>
                 </div>
-                <p className="line-clamp-1 text-sm font-medium">{item.name}</p>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted">{timeAgo(new Date(item.createdAt))}</span>
-                  <span className="font-semibold tabular-nums">
-                    {item.recommendedMedian !== null
-                      ? formatCurrency(item.recommendedMedian)
-                      : "—"}
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))}
+              </>
+            );
+
+            if (selectMode) {
+              const isSel = selected.has(item.id);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => toggleSelect(item.id)}
+                  className={`group relative overflow-hidden rounded-2xl border bg-surface/70 text-left transition ${
+                    isSel ? "border-brand ring-2 ring-brand" : "border-border"
+                  }`}
+                >
+                  <div className="absolute right-2 top-2 z-10 rounded-md bg-black/40 p-0.5 text-white">
+                    {isSel ? (
+                      <CheckSquare className="h-5 w-5 text-brand" />
+                    ) : (
+                      <Square className="h-5 w-5" />
+                    )}
+                  </div>
+                  {inner}
+                </button>
+              );
+            }
+
+            return (
+              <Link
+                key={item.id}
+                href={`/item/${item.id}`}
+                className="group overflow-hidden rounded-2xl border border-border bg-surface/70 transition hover:border-brand/60"
+              >
+                {inner}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
-import { ScanLine, LayoutGrid, Images, Wallet, Layers, Bell } from "lucide-react";
+import { ScanLine, LayoutGrid, Images, Wallet, Layers, Bell, BarChart3 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import "./globals.css";
 
@@ -50,6 +50,13 @@ export default async function RootLayout({
               >
                 <LayoutGrid className="h-4 w-4" />{" "}
                 <span className="hidden sm:inline">Library</span>
+              </Link>
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
+              >
+                <BarChart3 className="h-4 w-4" />{" "}
+                <span className="hidden sm:inline">Dashboard</span>
               </Link>
               <Link
                 href="/batch"
