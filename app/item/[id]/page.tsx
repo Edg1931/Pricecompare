@@ -356,6 +356,12 @@ export default async function ItemPage({
           Comparable listings{" "}
           <span className="text-muted">({item.comps.length})</span>
         </h2>
+        {item.comps.length > 0 && (
+          <p className="mb-1 text-xs text-muted">
+            Prices captured {item.updatedAt.toLocaleDateString()} — live listings may
+            have changed since. Re-analyze for the latest.
+          </p>
+        )}
         {item.marketContext && (
           <p className="mb-4 text-sm text-muted">{item.marketContext}</p>
         )}
