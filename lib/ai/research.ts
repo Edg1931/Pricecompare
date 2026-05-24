@@ -116,6 +116,8 @@ Search query: ${ident.searchQuery}
 
 Use web search to find comparable listings and recent sold prices across eBay, Etsy, Mercari, Facebook Marketplace, Swappa, Poshmark, and StockX. If you cannot find this exact item on resale sites, research the web to figure out what it is and find the closest comparable items, then price those.
 
+PRIORITIZE recent eBay SOLD/completed listings — these are the most accurate comps for resale value. Search eBay's sold/completed results (e.g. eBay sold listings for the item) and include several with "listingType": "sold", the actual SOLD price, and the eBay item URL. Sold comps matter more than active asking prices, so include as many real sold comps as you can find.
+
 Also estimate how this item's resale value has trended over time. Based on sold listings and demand, estimate the typical median SOLD price now, ~3 months ago, ~6 months ago, and ~1 year ago. These are best-effort estimates.
 
 Also assess demand: how quickly and reliably this item sells (sell-through), a realistic time-to-sell range, and whether there's a best time of year to sell it for top dollar.
@@ -158,7 +160,7 @@ CRITICAL accuracy rules for comps:
       {
         type: "web_search_20250305",
         name: "web_search",
-        max_uses: 2,
+        max_uses: 3,
       } as never,
     ],
     messages: [{ role: "user", content: prompt }],
