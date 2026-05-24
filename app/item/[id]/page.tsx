@@ -103,13 +103,18 @@ export default async function ItemPage({
       ? negotiation(item.recommendedMedian, item.askingPrice)
       : null;
 
-  // group comps by source
+  // Only show comps backed by a real sold/live listing (a verifiable link).
+  const realComps = item.comps.filter((c) => c.url);
   const grouped = new Map<string, typeof item.comps>();
-  for (const c of item.comps) {
+  for (const c of realComps) {
     const arr = grouped.get(c.source) ?? [];
     arr.push(c);
     grouped.set(c.source, arr);
   }
+  const marketSearchUrl = searchUrlForSource(
+    "ebay",
+    item.searchQuery || item.name
+  );
 
   return (
     <div className="space-y-6">
@@ -383,22 +388,34 @@ export default async function ItemPage({
 
       {/* Comparable listings */}
       <Card className="p-5">
-        <h2 className="mb-1 font-semibold">
-          Comparable listings{" "}
-          <span className="text-muted">({item.comps.length})</span>
-        </h2>
-        {item.comps.length > 0 && (
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <h2 className="font-semibold">
+            Comparable listings{" "}
+            <span className="text-muted">({realComps.length})</span>
+          </h2>
+          <a
+            href={marketSearchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 py-1 text-xs font-medium text-muted transition hover:text-brand"
+          >
+            <Search className="h-3.5 w-3.5" /> Search marketplace
+          </a>
+        </div>
+        {realComps.length > 0 && (
           <p className="mb-1 text-xs text-muted">
-            Prices captured {item.updatedAt.toLocaleDateString()} — live listings may
-            have changed since. Re-analyze for the latest.
+            Only real sold/live listings are shown. Prices captured{" "}
+            {item.updatedAt.toLocaleDateString()} — re-analyze for the latest.
           </p>
         )}
         {item.marketContext && (
           <p className="mb-4 text-sm text-muted">{item.marketContext}</p>
         )}
-        {item.comps.length === 0 ? (
+        {realComps.length === 0 ? (
           <p className="text-sm text-muted">
-            No comparable listings found. Try re-analyzing or add a hint.
+            No verified sold or live listings to show. Use{" "}
+            <span className="font-medium">Search marketplace</span> above to check
+            current prices, or re-analyze.
           </p>
         ) : (
           <div className="space-y-4">
@@ -428,30 +445,15 @@ export default async function ItemPage({
                             sold
                           </span>
                         )}
-                        {c.url ? (
-                          <a
-                            href={c.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="View this listing"
-                            className="text-muted transition hover:text-brand"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        ) : (
-                          <a
-                            href={searchUrlForSource(
-                              c.source,
-                              c.title || item.searchQuery || item.name
-                            )}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="No direct link — opens recent/sold listings for this item"
-                            className="inline-flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted transition hover:text-brand"
-                          >
-                            <Search className="h-3 w-3" /> search
-                          </a>
-                        )}
+                        <a
+                          href={c.url!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View this listing"
+                          className="text-muted transition hover:text-brand"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
                       </div>
                     ))}
                   </div>
