@@ -22,7 +22,7 @@ import { sourcingMetrics, negotiation } from "@/lib/analysis/deal";
 import { currentUserId } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
-import { marketplaceLinks } from "@/lib/marketplaces";
+import { marketplaceLinks, searchUrlForSource } from "@/lib/marketplaces";
 import { buildCrossListings } from "@/lib/crosslist";
 import type { Verdict } from "@/lib/types";
 import {
@@ -427,16 +427,21 @@ export default async function ItemPage({
                             sold
                           </span>
                         )}
-                        {c.url && (
-                          <a
-                            href={c.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-muted transition hover:text-brand"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        )}
+                        <a
+                          href={
+                            c.url ??
+                            searchUrlForSource(
+                              c.source,
+                              c.title || item.searchQuery || item.name
+                            )
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={c.url ? "View listing" : "Search this on " + meta.label}
+                          className="text-muted transition hover:text-brand"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
                       </div>
                     ))}
                   </div>
