@@ -40,6 +40,7 @@ import {
   EditDetailsButton,
   FlipTracker,
   NotesEditor,
+  AlertControl,
 } from "@/components/ItemControls";
 
 export default async function ItemPage({
@@ -123,6 +124,14 @@ export default async function ItemPage({
             />
             <ShareButton title={item.name} />
           </div>
+          <Card className="p-4">
+            <AlertControl
+              itemId={item.id}
+              alertTarget={item.alertTarget}
+              alertDirection={item.alertDirection}
+              triggered={item.alertTriggeredAt != null}
+            />
+          </Card>
           <Card className="p-4">
             <FlipTracker
               itemId={item.id}

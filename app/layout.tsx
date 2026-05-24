@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
-import { ScanLine, LayoutGrid, Images, Wallet, Layers } from "lucide-react";
+import { ScanLine, LayoutGrid, Images, Wallet, Layers, Bell } from "lucide-react";
+import { prisma } from "@/lib/db";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -22,7 +23,12 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  const alertCount = await prisma.item
+    .count({ where: { alertTriggeredAt: { not: null } } })
+    .catch(() => 0);
   return (
     <html
       lang="en"
@@ -63,6 +69,17 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               >
                 <Wallet className="h-4 w-4" />{" "}
                 <span className="hidden sm:inline">Inventory</span>
+              </Link>
+              <Link
+                href="/alerts"
+                className="relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
+              >
+                <Bell className="h-4 w-4" />
+                {alertCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-steal px-1 text-[10px] font-bold text-white">
+                    {alertCount}
+                  </span>
+                )}
               </Link>
               <Link
                 href="/scan"

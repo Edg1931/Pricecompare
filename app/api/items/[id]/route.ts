@@ -20,6 +20,9 @@ const patchSchema = z.object({
   soldMarketplace: z.string().max(60).nullable().optional(),
   soldFees: z.number().nonnegative().nullable().optional(),
   shippingCost: z.number().nonnegative().nullable().optional(),
+  alertTarget: z.number().nonnegative().nullable().optional(),
+  alertDirection: z.enum(["below", "above"]).nullable().optional(),
+  dismissAlert: z.boolean().optional(),
 });
 
 export async function GET(
@@ -94,6 +97,11 @@ export async function PATCH(
       ...(data.soldMarketplace !== undefined ? { soldMarketplace: data.soldMarketplace } : {}),
       ...(data.soldFees !== undefined ? { soldFees: data.soldFees } : {}),
       ...(data.shippingCost !== undefined ? { shippingCost: data.shippingCost } : {}),
+      ...(data.alertTarget !== undefined
+        ? { alertTarget: data.alertTarget, alertTriggeredAt: null }
+        : {}),
+      ...(data.alertDirection !== undefined ? { alertDirection: data.alertDirection } : {}),
+      ...(data.dismissAlert ? { alertTriggeredAt: null } : {}),
       ...(data.soldPrice !== undefined ? { soldPrice: data.soldPrice } : {}),
       ...boughtAtUpdate,
       ...soldAtUpdate,

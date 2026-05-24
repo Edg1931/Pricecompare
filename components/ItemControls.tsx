@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, Trash2, Check, Pencil, X, Loader2 } from "lucide-react";
+import { RefreshCw, Trash2, Check, Pencil, X, Loader2, Bell, BellRing } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { MARKETPLACES, marketplaceFee, realizedPnL } from "@/lib/analysis/deal";
 import { VoiceInput } from "@/components/VoiceInput";
@@ -599,6 +599,136 @@ export function EditDetailsButton({ item }: { item: EditableItem }) {
         </div>
       )}
     </>
+  );
+}
+
+export function AlertControl({
+  itemId,
+  alertTarget,
+  alertDirection,
+  triggered,
+}: {
+  itemId: string;
+  alertTarget: number | null;
+  alertDirection: string | null;
+  triggered: boolean;
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [direction, setDirection] = useState(alertDirection ?? "below");
+  const [target, setTarget] = useState(alertTarget != null ? String(alertTarget) : "");
+
+  async function patch(body: Record<string, unknown>) {
+    setBusy(true);
+    await fetch(`/api/items/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    setBusy(false);
+    setEditing(false);
+    router.refresh();
+  }
+
+  const active = alertTarget != null;
+
+  if (active && !editing) {
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        {triggered ? (
+          <BellRing className="h-4 w-4 text-steal" />
+        ) : (
+          <Bell className="h-4 w-4 text-muted" />
+        )}
+        <span className={triggered ? "font-medium text-steal" : ""}>
+          {triggered ? "Target hit — " : "Alerting "}
+          when est. price {alertDirection === "above" ? "≥" : "≤"}{" "}
+          {formatCurrency(alertTarget)}
+        </span>
+        <button
+          onClick={() => setEditing(true)}
+          className="ml-auto text-xs text-muted underline-offset-2 hover:underline"
+        >
+          Edit
+        </button>
+        <button
+          onClick={() => patch({ alertTarget: null, alertDirection: null })}
+          disabled={busy}
+          className="text-xs text-muted underline-offset-2 hover:text-over hover:underline"
+        >
+          Remove
+        </button>
+      </div>
+    );
+  }
+
+  if (!active && !editing) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        className="inline-flex items-center gap-1.5 text-sm text-muted transition hover:text-brand"
+      >
+        <Bell className="h-4 w-4" /> Set a price alert
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-muted">Alert when est. price</span>
+      <select
+        value={direction}
+        onChange={(e) => setDirection(e.target.value)}
+        className="rounded-lg border border-border bg-surface-2 px-2 py-1.5 outline-none focus:border-brand"
+      >
+        <option value="below">drops below</option>
+        <option value="above">rises above</option>
+      </select>
+      <div className="flex items-center rounded-lg border border-border bg-surface-2 px-2">
+        <span className="text-muted">$</span>
+        <input
+          autoFocus
+          type="number"
+          inputMode="decimal"
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          className="w-20 bg-transparent px-1 py-1.5 outline-none"
+          placeholder="0"
+        />
+      </div>
+      <button
+        onClick={() =>
+          patch({ alertTarget: target.trim() ? Number(target) : null, alertDirection: direction })
+        }
+        disabled={busy || !target.trim()}
+        className="grid h-8 w-8 place-items-center rounded-lg bg-brand text-white disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
+
+export function DismissAlertButton({ itemId }: { itemId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      onClick={async () => {
+        setBusy(true);
+        await fetch(`/api/items/${itemId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dismissAlert: true }),
+        });
+        router.refresh();
+      }}
+      disabled={busy}
+      className="shrink-0 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted transition hover:text-fg disabled:opacity-50"
+    >
+      {busy ? "…" : "Dismiss"}
+    </button>
   );
 }
 
