@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { ScanLine, Loader2 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,8 +31,8 @@ export default function LoginPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         await fetch("/api/auth/claim", { method: "POST" }).catch(() => {});
-        router.push("/");
-        router.refresh();
+        // Full reload so the middleware sees the freshly-set session cookie.
+        window.location.assign("/");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
