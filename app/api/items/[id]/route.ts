@@ -23,6 +23,7 @@ const patchSchema = z.object({
   alertTarget: z.number().nonnegative().nullable().optional(),
   alertDirection: z.enum(["below", "above"]).nullable().optional(),
   dismissAlert: z.boolean().optional(),
+  storageLocation: z.string().max(120).nullable().optional(),
 });
 
 export async function GET(
@@ -102,6 +103,7 @@ export async function PATCH(
         : {}),
       ...(data.alertDirection !== undefined ? { alertDirection: data.alertDirection } : {}),
       ...(data.dismissAlert ? { alertTriggeredAt: null } : {}),
+      ...(data.storageLocation !== undefined ? { storageLocation: data.storageLocation } : {}),
       ...(data.soldPrice !== undefined ? { soldPrice: data.soldPrice } : {}),
       ...boughtAtUpdate,
       ...soldAtUpdate,

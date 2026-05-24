@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import QRCode from "qrcode";
+import { skuFor } from "@/lib/sku";
 import {
   ArrowLeft,
   ExternalLink,
@@ -41,7 +44,9 @@ import {
   FlipTracker,
   NotesEditor,
   AlertControl,
+  StorageEditor,
 } from "@/components/ItemControls";
+import { PrintLabelButton } from "@/components/PrintLabel";
 
 export default async function ItemPage({
   params,
@@ -68,6 +73,13 @@ export default async function ItemPage({
     median: s.median,
     createdAt: s.createdAt.toISOString(),
   }));
+  const sku = skuFor(item.id);
+  const h = await headers();
+  const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  const qrDataUrl = await QRCode.toDataURL(`${origin}/item/${item.id}`, {
+    margin: 1,
+    width: 240,
+  });
   const market = marketplaceLinks(item.searchQuery ?? item.name);
   const crossListings = buildCrossListings({
     name: item.name,
@@ -144,6 +156,22 @@ export default async function ItemPage({
               shippingCost={item.shippingCost}
               projectedNet={netProceeds[0]?.net ?? null}
               bestPlatform={item.bestPlatform}
+            />
+          </Card>
+          <Card className="space-y-3 p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs uppercase tracking-wide text-muted">
+                Storage &amp; label
+              </span>
+              <span className="font-mono text-xs text-muted">{sku}</span>
+            </div>
+            <StorageEditor itemId={item.id} initial={item.storageLocation} />
+            <PrintLabelButton
+              qrDataUrl={qrDataUrl}
+              sku={sku}
+              name={item.name}
+              price={formatCurrency(item.recommendedMedian ?? item.askingPrice)}
+              location={item.storageLocation}
             />
           </Card>
         </div>

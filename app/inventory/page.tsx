@@ -236,6 +236,7 @@ export default async function InventoryPage() {
                           )}
                           {" · held "}
                           {ageDays}d
+                          {item.storageLocation ? ` · ${item.storageLocation}` : ""}
                         </p>
                       </div>
                       {aging ? (

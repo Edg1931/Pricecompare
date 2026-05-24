@@ -710,6 +710,51 @@ export function AlertControl({
   );
 }
 
+export function StorageEditor({
+  itemId,
+  initial,
+}: {
+  itemId: string;
+  initial: string | null;
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState(initial ?? "");
+  const [saving, setSaving] = useState(false);
+  const dirty = value !== (initial ?? "");
+
+  async function save() {
+    setSaving(true);
+    await fetch(`/api/items/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storageLocation: value.trim() || null }),
+    });
+    setSaving(false);
+    router.refresh();
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && dirty && save()}
+        placeholder="e.g. Bin A3, Shelf 2"
+        className="w-full rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm outline-none focus:border-brand"
+      />
+      {dirty && (
+        <button
+          onClick={save}
+          disabled={saving}
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand text-white disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function DismissAlertButton({ itemId }: { itemId: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
