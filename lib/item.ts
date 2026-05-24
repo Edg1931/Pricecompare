@@ -6,12 +6,18 @@ import type { Demand, PlatformNet, PriceTrend } from "@/lib/types";
 /** Create an Item row (+photos +comps) from an analysis result. */
 export async function persistAnalysis(
   result: AnalysisResult,
-  opts: { imageDataUrls: string[]; askingPrice: number | null; notes?: string | null }
+  opts: {
+    imageDataUrls: string[];
+    askingPrice: number | null;
+    notes?: string | null;
+    userId?: string | null;
+  }
 ) {
   const { identification: id, aggregate, deal } = result;
 
   const item = await prisma.item.create({
     data: {
+      userId: opts.userId ?? null,
       name: id.name,
       brand: id.brand,
       model: id.model,
@@ -75,9 +81,9 @@ export type ItemWithRelations = NonNullable<
   Awaited<ReturnType<typeof getItem>>
 >;
 
-export async function getItem(id: string) {
-  return prisma.item.findUnique({
-    where: { id },
+export async function getItem(id: string, userId: string | null = null) {
+  return prisma.item.findFirst({
+    where: { id, ...(userId ? { userId } : {}) },
     include: {
       photos: { orderBy: { order: "asc" } },
       comps: { orderBy: { price: "asc" } },

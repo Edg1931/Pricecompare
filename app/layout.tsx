@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
-import { ScanLine, LayoutGrid, Images, Wallet, Layers, Bell, BarChart3 } from "lucide-react";
+import { ScanLine, LayoutGrid, Images, Wallet, Layers, Bell, BarChart3, LogOut } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { getUser, ownerWhere } from "@/lib/auth";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -26,8 +27,9 @@ export const viewport: Viewport = {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const user = await getUser();
   const alertCount = await prisma.item
-    .count({ where: { alertTriggeredAt: { not: null } } })
+    .count({ where: { alertTriggeredAt: { not: null }, ...ownerWhere(user?.id ?? null) } })
     .catch(() => 0);
   return (
     <html
@@ -94,6 +96,17 @@ export default async function RootLayout({
               >
                 <ScanLine className="h-4 w-4" /> Scan
               </Link>
+              {user && (
+                <form action="/auth/signout" method="post" className="ml-1">
+                  <button
+                    type="submit"
+                    title={`Sign out${user.email ? ` (${user.email})` : ""}`}
+                    className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                </form>
+              )}
             </nav>
           </div>
         </header>

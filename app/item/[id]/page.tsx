@@ -19,6 +19,7 @@ import {
   parseDemand,
 } from "@/lib/item";
 import { sourcingMetrics, negotiation } from "@/lib/analysis/deal";
+import { currentUserId } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
 import { marketplaceLinks } from "@/lib/marketplaces";
@@ -54,7 +55,8 @@ export default async function ItemPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const item = await getItem(id);
+  const userId = await currentUserId();
+  const item = await getItem(id, userId);
   if (!item) notFound();
 
   const attributes = parseAttributes(item.attributes);

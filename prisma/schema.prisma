@@ -13,6 +13,8 @@ model Item {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  userId            String?  // owner (Supabase auth user id); null = pre-auth
+
   // Identification (from Claude vision)
   name              String
   brand             String?
@@ -71,17 +73,22 @@ model Item {
   photos            Photo[]
   comps             Comp[]
   snapshots         PriceSnapshot[]
+
+  @@index([userId])
 }
 
 // Business expenses (mileage, supplies, etc.) for true net profit and taxes.
 model Expense {
   id          String   @id @default(cuid())
+  userId      String?
   date        DateTime @default(now())
   type        String   @default("other") // mileage | supplies | shipping | fees | other
   description String?
   amount      Float    @default(0)
   miles       Float?
   createdAt   DateTime @default(now())
+
+  @@index([userId])
 }
 
 // A point-in-time record of the estimated resale price, captured on each

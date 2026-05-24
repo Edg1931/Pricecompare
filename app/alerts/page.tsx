@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Bell, BellRing, ArrowRight, Package } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
+import { currentUserId, ownerWhere } from "@/lib/auth";
 import { DismissAlertButton } from "@/components/ItemControls";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +20,9 @@ function Thumb({ url, name }: { url?: string; name: string }) {
 }
 
 export default async function AlertsPage() {
+  const userId = await currentUserId();
   const watched = await prisma.item.findMany({
-    where: { alertTarget: { not: null }, soldPrice: null },
+    where: { alertTarget: { not: null }, soldPrice: null, ...ownerWhere(userId) },
     orderBy: [{ alertTriggeredAt: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
     include: { photos: { orderBy: { order: "asc" }, take: 1 } },
   });
