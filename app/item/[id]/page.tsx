@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Trophy,
   Handshake,
+  Search,
 } from "lucide-react";
 import {
   getItem,
@@ -427,21 +428,30 @@ export default async function ItemPage({
                             sold
                           </span>
                         )}
-                        <a
-                          href={
-                            c.url ??
-                            searchUrlForSource(
+                        {c.url ? (
+                          <a
+                            href={c.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="View this listing"
+                            className="text-muted transition hover:text-brand"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        ) : (
+                          <a
+                            href={searchUrlForSource(
                               c.source,
                               c.title || item.searchQuery || item.name
-                            )
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={c.url ? "View listing" : "Search this on " + meta.label}
-                          className="text-muted transition hover:text-brand"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="No direct link — opens recent/sold listings for this item"
+                            className="inline-flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted transition hover:text-brand"
+                          >
+                            <Search className="h-3 w-3" /> search
+                          </a>
+                        )}
                       </div>
                     ))}
                   </div>
