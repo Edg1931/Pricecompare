@@ -57,6 +57,7 @@ model Item {
 
   status            String  @default("analyzed")
   notes             String?
+  storageLocation   String?   // bin/shelf where the item is stored
 
   // Flip / P&L tracking (filled in as you buy and sell)
   purchasePrice     Float?    // what you actually paid
