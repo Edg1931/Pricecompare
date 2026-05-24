@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { analyzeDeal } from "@/lib/analysis/deal";
+import { currentUserId, ownerWhere } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -31,8 +32,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const item = await prisma.item.findUnique({
-    where: { id },
+  const userId = await currentUserId();
+  const item = await prisma.item.findFirst({
+    where: { id, ...ownerWhere(userId) },
     include: { photos: { orderBy: { order: "asc" } }, comps: true },
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -44,7 +46,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const existing = await prisma.item.findUnique({ where: { id } });
+  const userId = await currentUserId();
+  const existing = await prisma.item.findFirst({ where: { id, ...ownerWhere(userId) } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const parsed = patchSchema.safeParse(await req.json().catch(() => ({})));
@@ -118,6 +121,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  await prisma.item.delete({ where: { id } }).catch(() => null);
+  const userId = await currentUserId();
+  await prisma.item.deleteMany({ where: { id, ...ownerWhere(userId) } }).catch(() => null);
   return NextResponse.json({ ok: true });
 }

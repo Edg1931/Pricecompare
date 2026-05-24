@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { expenseAmount } from "@/lib/expenses";
+import { currentUserId, ownerWhere } from "@/lib/auth";
+import { authEnabled } from "@/lib/supabase/config";
 
 export const runtime = "nodejs";
 
@@ -14,7 +16,11 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  const expenses = await prisma.expense.findMany({ orderBy: { date: "desc" } });
+  const userId = await currentUserId();
+  const expenses = await prisma.expense.findMany({
+    where: ownerWhere(userId),
+    orderBy: { date: "desc" },
+  });
   return NextResponse.json({ expenses });
 }
 
@@ -23,10 +29,15 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid expense." }, { status: 400 });
   }
+  const userId = await currentUserId();
+  if (authEnabled() && !userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const d = parsed.data;
   const amount = expenseAmount(d.type, d.amount ?? null, d.miles ?? null);
   const expense = await prisma.expense.create({
     data: {
+      userId,
       date: d.date ? new Date(d.date) : new Date(),
       type: d.type,
       description: d.description ?? null,

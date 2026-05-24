@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Trophy,
   Handshake,
+  Search,
 } from "lucide-react";
 import {
   getItem,
@@ -19,9 +20,10 @@ import {
   parseDemand,
 } from "@/lib/item";
 import { sourcingMetrics, negotiation } from "@/lib/analysis/deal";
+import { currentUserId } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
-import { marketplaceLinks } from "@/lib/marketplaces";
+import { marketplaceLinks, searchUrlForSource } from "@/lib/marketplaces";
 import { buildCrossListings } from "@/lib/crosslist";
 import type { Verdict } from "@/lib/types";
 import {
@@ -54,7 +56,8 @@ export default async function ItemPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const item = await getItem(id);
+  const userId = await currentUserId();
+  const item = await getItem(id, userId);
   if (!item) notFound();
 
   const attributes = parseAttributes(item.attributes);
@@ -425,14 +428,28 @@ export default async function ItemPage({
                             sold
                           </span>
                         )}
-                        {c.url && (
+                        {c.url ? (
                           <a
                             href={c.url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            title="View this listing"
                             className="text-muted transition hover:text-brand"
                           >
                             <ExternalLink className="h-4 w-4" />
+                          </a>
+                        ) : (
+                          <a
+                            href={searchUrlForSource(
+                              c.source,
+                              c.title || item.searchQuery || item.name
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="No direct link — opens recent/sold listings for this item"
+                            className="inline-flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted transition hover:text-brand"
+                          >
+                            <Search className="h-3 w-3" /> search
                           </a>
                         )}
                       </div>

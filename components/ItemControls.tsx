@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Trash2, Check, Pencil, X, Loader2, Bell, BellRing } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
@@ -285,7 +286,12 @@ function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  return (
+  // Portal to <body> so the fixed overlay isn't trapped inside an ancestor
+  // that creates a containing block (e.g. a card using backdrop-blur).
+  // This component only renders after a click, so document is always defined.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
@@ -299,7 +305,8 @@ function Modal({
         </div>
         <div className="space-y-3">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

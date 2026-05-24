@@ -3,12 +3,14 @@ import { BarChart3, ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { realizedPnL } from "@/lib/analysis/deal";
+import { currentUserId, ownerWhere } from "@/lib/auth";
 import { Stat } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const items = await prisma.item.findMany();
+  const userId = await currentUserId();
+  const items = await prisma.item.findMany({ where: ownerWhere(userId) });
   const now = new Date();
 
   const sold = items.filter((i) => i.soldPrice != null);

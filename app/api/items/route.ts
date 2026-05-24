@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { analyzeFromImages, priceAndAnalyze } from "@/lib/analysis/pipeline";
 import { persistAnalysis } from "@/lib/item";
 import { hasAnthropic } from "@/lib/ai/client";
+import { currentUserId, ownerWhere } from "@/lib/auth";
+import { authEnabled } from "@/lib/supabase/config";
 import type { ItemIdentification } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -57,6 +59,11 @@ export async function POST(req: Request) {
 
   const { images, askingPrice, notes, hint, identification } = parsed.data;
 
+  const userId = await currentUserId();
+  if (authEnabled() && !userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const result = identification
       ? await priceAndAnalyze(
@@ -78,6 +85,7 @@ export async function POST(req: Request) {
       imageDataUrls: images,
       askingPrice: askingPrice ?? null,
       notes,
+      userId,
     });
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
@@ -88,7 +96,9 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
+  const userId = await currentUserId();
   const items = await prisma.item.findMany({
+    where: ownerWhere(userId),
     orderBy: { createdAt: "desc" },
     include: { photos: { orderBy: { order: "asc" }, take: 1 } },
   });

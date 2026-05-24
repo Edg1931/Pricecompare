@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { realizedPnL } from "@/lib/analysis/deal";
 import { EXPENSE_LABEL } from "@/lib/expenses";
+import { currentUserId, ownerWhere } from "@/lib/auth";
 import { Stat } from "@/components/ui";
 import {
   AddExpenseForm,
@@ -14,9 +15,10 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function ExpensesPage() {
+  const userId = await currentUserId();
   const [expenses, soldItems] = await Promise.all([
-    prisma.expense.findMany({ orderBy: { date: "desc" } }),
-    prisma.item.findMany({ where: { NOT: { soldPrice: null } } }),
+    prisma.expense.findMany({ where: ownerWhere(userId), orderBy: { date: "desc" } }),
+    prisma.item.findMany({ where: { NOT: { soldPrice: null }, ...ownerWhere(userId) } }),
   ]);
 
   // Sales side

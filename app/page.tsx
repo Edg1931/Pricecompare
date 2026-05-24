@@ -3,13 +3,17 @@ import { ScanLine, Sparkles, Images } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { parseNetProceeds } from "@/lib/item";
+import { getUser, ownerWhere, claimOrphansIfOwner } from "@/lib/auth";
 import { Stat } from "@/components/ui";
 import { LibraryBrowser, type LibItem } from "@/components/LibraryBrowser";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  const user = await getUser();
+  if (user) await claimOrphansIfOwner(user);
   const items = await prisma.item.findMany({
+    where: ownerWhere(user?.id ?? null),
     orderBy: { createdAt: "desc" },
     include: { photos: { orderBy: { order: "asc" }, take: 1 } },
   });
