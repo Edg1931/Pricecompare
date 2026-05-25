@@ -11,6 +11,8 @@ export interface PnlRow {
   fees: number | null;
   shipping: number | null;
   net: number | null;
+  tax: number | null;
+  afterTax: number | null;
   soldAt: string;
 }
 
@@ -20,6 +22,8 @@ export interface PnlTotals {
   fees: number;
   shipping: number;
   net: number;
+  tax: number;
+  afterTax: number;
 }
 
 const esc = (v: string | number | null) => {
@@ -46,6 +50,8 @@ export function PnlExportButton({
       "Fees",
       "Shipping",
       "Net P&L",
+      "Est. tax",
+      "After tax",
       "Sold date",
     ];
     const body = rows.map((r) =>
@@ -58,6 +64,8 @@ export function PnlExportButton({
         money(r.fees),
         money(r.shipping),
         money(r.net),
+        money(r.tax),
+        money(r.afterTax),
         r.soldAt,
       ]
         .map(esc)
@@ -72,6 +80,8 @@ export function PnlExportButton({
       money(totals.fees),
       money(totals.shipping),
       money(totals.net),
+      money(totals.tax),
+      money(totals.afterTax),
       "",
     ]
       .map(esc)

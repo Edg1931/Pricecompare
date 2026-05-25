@@ -129,10 +129,17 @@ export function FlipTracker(props: FlipProps) {
           <Row label="Cost" value={`− ${formatCurrency(pnl.cost)}`} muted />
           <Row label="Platform fees" value={`− ${formatCurrency(pnl.fees)}`} muted />
           <Row label="Shipping" value={`− ${formatCurrency(pnl.shipping)}`} muted />
-          <div className="mt-1 flex items-center justify-between border-t border-border pt-2 font-semibold">
-            <span>Realized {pnl.net >= 0 ? "profit" : "loss"}</span>
-            <span className={pnl.net >= 0 ? "text-steal" : "text-over"}>
+          <div className="mt-1 flex items-center justify-between border-t border-border pt-2 text-sm">
+            <span>Profit before tax</span>
+            <span className={pnl.net >= 0 ? "" : "text-over"}>
               {formatCurrency(pnl.net)}
+            </span>
+          </div>
+          <Row label="Est. tax set-aside" value={`− ${formatCurrency(pnl.tax)}`} muted />
+          <div className="mt-1 flex items-center justify-between border-t border-border pt-2 font-semibold">
+            <span>Net after tax</span>
+            <span className={pnl.afterTax >= 0 ? "text-steal" : "text-over"}>
+              {formatCurrency(pnl.afterTax)}
             </span>
           </div>
           <button
@@ -223,14 +230,18 @@ export function FlipTracker(props: FlipProps) {
 
           {preview && (
             <div className="rounded-lg bg-surface-2/60 p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Fees</span>
+              <div className="flex items-center justify-between text-muted">
+                <span>Fees</span>
                 <span>− {formatCurrency(preview.fees)}</span>
               </div>
-              <div className="mt-1 flex items-center justify-between font-semibold">
-                <span>Realized {preview.net >= 0 ? "profit" : "loss"}</span>
-                <span className={preview.net >= 0 ? "text-steal" : "text-over"}>
-                  {formatCurrency(preview.net)}
+              <div className="flex items-center justify-between text-muted">
+                <span>Est. tax set-aside</span>
+                <span>− {formatCurrency(preview.tax)}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between border-t border-border pt-1.5 font-semibold">
+                <span>Net after tax</span>
+                <span className={preview.afterTax >= 0 ? "text-steal" : "text-over"}>
+                  {formatCurrency(preview.afterTax)}
                 </span>
               </div>
             </div>

@@ -64,8 +64,14 @@ export interface RealizedPnL {
   cost: number; // what you paid for the item
   fees: number; // platform fees
   shipping: number;
-  net: number; // realized profit/loss
+  net: number; // realized profit/loss before tax
+  tax: number; // estimated tax set-aside (on positive profit only)
+  afterTax: number; // net - tax
 }
+
+// Default estimated tax set-aside rate (income + self-employment, ballpark).
+// Configurable per user later via Settings.
+export const DEFAULT_TAX_RATE = 0.25;
 
 /** Realized profit/loss for a sold item, or null if it hasn't sold. */
 export function realizedPnL(opts: {
@@ -74,6 +80,7 @@ export function realizedPnL(opts: {
   soldMarketplace: string | null;
   shippingCost: number | null;
   feesOverride?: number | null;
+  taxRate?: number;
 }): RealizedPnL | null {
   if (opts.soldPrice == null) return null;
   const revenue = opts.soldPrice;
@@ -84,7 +91,10 @@ export function realizedPnL(opts: {
       : marketplaceFee(opts.soldMarketplace, revenue);
   const shipping = opts.shippingCost ?? 0;
   const net = Math.round((revenue - cost - fees - shipping) * 100) / 100;
-  return { revenue, cost, fees, shipping, net };
+  const rate = opts.taxRate ?? DEFAULT_TAX_RATE;
+  const tax = Math.max(0, Math.round(net * rate * 100) / 100);
+  const afterTax = Math.round((net - tax) * 100) / 100;
+  return { revenue, cost, fees, shipping, net, tax, afterTax };
 }
 
 export function computeNetProceeds(salePrice: number): PlatformNet[] {
