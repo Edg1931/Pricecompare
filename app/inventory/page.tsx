@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/utils";
 import { realizedPnL } from "@/lib/analysis/deal";
 import { parseNetProceeds } from "@/lib/item";
 import { currentUserId, ownerWhere } from "@/lib/auth";
+import { getSettings } from "@/lib/settings";
 import { Stat } from "@/components/ui";
 import { PnlExportButton, type PnlRow } from "@/components/ReportExport";
 
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function InventoryPage() {
   const userId = await currentUserId();
+  const settings = await getSettings(userId);
   const items = await prisma.item.findMany({
     where: ownerWhere(userId),
     orderBy: { createdAt: "desc" },
@@ -37,6 +39,7 @@ export default async function InventoryPage() {
       soldMarketplace: i.soldMarketplace,
       shippingCost: i.shippingCost,
       feesOverride: i.soldFees,
+      taxRate: settings.taxRate,
     })!;
     totals.revenue += pnl.revenue;
     totals.cost += pnl.cost;

@@ -21,6 +21,7 @@ import {
 } from "@/lib/item";
 import { sourcingMetrics, negotiation } from "@/lib/analysis/deal";
 import { currentUserId } from "@/lib/auth";
+import { getSettings } from "@/lib/settings";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
 import { marketplaceLinks, searchUrlForSource } from "@/lib/marketplaces";
@@ -59,6 +60,7 @@ export default async function ItemPage({
   const userId = await currentUserId();
   const item = await getItem(id, userId);
   if (!item) notFound();
+  const settings = await getSettings(userId);
 
   const attributes = parseAttributes(item.attributes);
   const netProceeds = parseNetProceeds(item.netProceeds);
@@ -164,6 +166,8 @@ export default async function ItemPage({
               shippingCost={item.shippingCost}
               projectedNet={netProceeds[0]?.net ?? null}
               bestPlatform={item.bestPlatform}
+              taxRate={settings.taxRate}
+              defaultMarketplace={settings.defaultMarketplace}
             />
           </Card>
           <Card className="space-y-3 p-4">

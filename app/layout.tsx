@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
-import { ScanLine, LayoutGrid, Images, Wallet, Layers, Bell, BarChart3, LogOut } from "lucide-react";
+import { ScanLine, LayoutGrid, Images, Wallet, Layers, Bell, BarChart3, LogOut, Settings } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getUser, ownerWhere } from "@/lib/auth";
 import "./globals.css";
@@ -95,6 +95,13 @@ export default async function RootLayout({
                 className="flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-brand to-brand-2 px-3.5 py-1.5 font-medium text-white shadow-lg shadow-brand/30 transition hover:opacity-90"
               >
                 <ScanLine className="h-4 w-4" /> Scan
+              </Link>
+              <Link
+                href="/settings"
+                title="Settings"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
+              >
+                <Settings className="h-4 w-4" />
               </Link>
               {user && (
                 <form action="/auth/signout" method="post" className="ml-1">

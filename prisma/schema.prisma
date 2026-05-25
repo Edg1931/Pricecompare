@@ -77,6 +77,15 @@ model Item {
   @@index([userId])
 }
 
+// Per-user preferences for the money math (defaults applied when absent).
+model UserSettings {
+  userId             String   @id // owner key; "__default__" in open mode
+  taxRate            Float    @default(0.25)
+  mileageRate        Float    @default(0.7)
+  defaultMarketplace String?
+  updatedAt          DateTime @updatedAt
+}
+
 // Business expenses (mileage, supplies, etc.) for true net profit and taxes.
 model Expense {
   id          String   @id @default(cuid())

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { expenseAmount } from "@/lib/expenses";
 import { currentUserId, ownerWhere } from "@/lib/auth";
 import { authEnabled } from "@/lib/supabase/config";
+import { getSettings } from "@/lib/settings";
 
 export const runtime = "nodejs";
 
@@ -34,7 +35,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const d = parsed.data;
-  const amount = expenseAmount(d.type, d.amount ?? null, d.miles ?? null);
+  const settings = await getSettings(userId);
+  const amount = expenseAmount(d.type, d.amount ?? null, d.miles ?? null, settings.mileageRate);
   const expense = await prisma.expense.create({
     data: {
       userId,

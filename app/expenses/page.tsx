@@ -2,9 +2,10 @@ import Link from "next/link";
 import { ArrowLeft, Receipt } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
-import { realizedPnL, DEFAULT_TAX_RATE } from "@/lib/analysis/deal";
+import { realizedPnL } from "@/lib/analysis/deal";
 import { EXPENSE_LABEL } from "@/lib/expenses";
 import { currentUserId, ownerWhere } from "@/lib/auth";
+import { getSettings } from "@/lib/settings";
 import { Stat } from "@/components/ui";
 import {
   AddExpenseForm,
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ExpensesPage() {
   const userId = await currentUserId();
+  const settings = await getSettings(userId);
   const [expenses, soldItems] = await Promise.all([
     prisma.expense.findMany({ where: ownerWhere(userId), orderBy: { date: "desc" } }),
     prisma.item.findMany({ where: { NOT: { soldPrice: null }, ...ownerWhere(userId) } }),
@@ -52,7 +54,7 @@ export default async function ExpensesPage() {
   }
 
   const net = revenue - cogs - sellingFees - shippingSales - totalExpenses;
-  const estTax = Math.max(0, net) * DEFAULT_TAX_RATE;
+  const estTax = Math.max(0, net) * settings.taxRate;
   const afterTax = net - estTax;
 
   const lines = [
@@ -69,7 +71,7 @@ export default async function ExpensesPage() {
     })),
     { label: "Net profit (before tax)", amount: net },
     {
-      label: `Estimated tax set-aside (${Math.round(DEFAULT_TAX_RATE * 100)}%)`,
+      label: `Estimated tax set-aside (${Math.round(settings.taxRate * 100)}%)`,
       amount: -estTax,
     },
     { label: "Net after tax", amount: afterTax },
@@ -108,7 +110,7 @@ export default async function ExpensesPage() {
         />
       </div>
 
-      <AddExpenseForm />
+      <AddExpenseForm mileageRate={settings.mileageRate} />
 
       {/* Expense list */}
       <section>

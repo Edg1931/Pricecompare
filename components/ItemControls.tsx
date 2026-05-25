@@ -33,6 +33,8 @@ interface FlipProps {
   shippingCost: number | null;
   projectedNet: number | null; // best take-home at median
   bestPlatform: string | null;
+  taxRate?: number;
+  defaultMarketplace?: string | null;
 }
 
 export function FlipTracker(props: FlipProps) {
@@ -46,7 +48,7 @@ export function FlipTracker(props: FlipProps) {
   );
   const [soldPrice, setSoldPrice] = useState(String(props.soldPrice ?? ""));
   const [marketplace, setMarketplace] = useState(
-    props.soldMarketplace ?? props.bestPlatform ?? MARKETPLACES[0]
+    props.soldMarketplace ?? props.defaultMarketplace ?? props.bestPlatform ?? MARKETPLACES[0]
   );
   const [shipping, setShipping] = useState(String(props.shippingCost ?? ""));
   const [feesInput, setFeesInput] = useState(String(props.soldFees ?? ""));
@@ -86,6 +88,7 @@ export function FlipTracker(props: FlipProps) {
     soldMarketplace: props.soldMarketplace,
     shippingCost: props.shippingCost,
     feesOverride: props.soldFees,
+    taxRate: props.taxRate,
   });
 
   const preview = realizedPnL({
@@ -94,6 +97,7 @@ export function FlipTracker(props: FlipProps) {
     soldMarketplace: marketplace,
     shippingCost: toNum(shipping),
     feesOverride: effectiveFee,
+    taxRate: props.taxRate,
   });
 
   return (
