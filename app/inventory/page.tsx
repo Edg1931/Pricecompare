@@ -28,7 +28,7 @@ export default async function InventoryPage() {
   let capitalInvested = 0;
   for (const i of holding) capitalInvested += i.purchasePrice ?? i.askingPrice ?? 0;
 
-  const totals = { revenue: 0, cost: 0, fees: 0, shipping: 0, net: 0 };
+  const totals = { revenue: 0, cost: 0, fees: 0, shipping: 0, net: 0, tax: 0, afterTax: 0 };
   const soldRows = sold.map((i) => {
     const cost = i.purchasePrice ?? i.askingPrice ?? null;
     const pnl = realizedPnL({
@@ -43,6 +43,8 @@ export default async function InventoryPage() {
     totals.fees += pnl.fees;
     totals.shipping += pnl.shipping;
     totals.net += pnl.net;
+    totals.tax += pnl.tax;
+    totals.afterTax += pnl.afterTax;
     return { item: i, pnl };
   });
 
@@ -82,6 +84,8 @@ export default async function InventoryPage() {
       fees: pnl.fees,
       shipping: pnl.shipping,
       net: pnl.net,
+      tax: pnl.tax,
+      afterTax: pnl.afterTax,
       soldAt: item.soldAt ? item.soldAt.toISOString().slice(0, 10) : "",
     })),
     ...holding.map((item) => ({
@@ -93,6 +97,8 @@ export default async function InventoryPage() {
       fees: null,
       shipping: null,
       net: null,
+      tax: null,
+      afterTax: null,
       soldAt: "",
     })),
   ];
@@ -143,6 +149,7 @@ export default async function InventoryPage() {
                   {formatCurrency(totals.net)}
                 </span>
               }
+              sub={`${formatCurrency(totals.afterTax)} after est. tax`}
             />
           </div>
 

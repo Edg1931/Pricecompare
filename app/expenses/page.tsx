@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Receipt } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
-import { realizedPnL } from "@/lib/analysis/deal";
+import { realizedPnL, DEFAULT_TAX_RATE } from "@/lib/analysis/deal";
 import { EXPENSE_LABEL } from "@/lib/expenses";
 import { currentUserId, ownerWhere } from "@/lib/auth";
 import { Stat } from "@/components/ui";
@@ -52,6 +52,8 @@ export default async function ExpensesPage() {
   }
 
   const net = revenue - cogs - sellingFees - shippingSales - totalExpenses;
+  const estTax = Math.max(0, net) * DEFAULT_TAX_RATE;
+  const afterTax = net - estTax;
 
   const lines = [
     { label: "Gross sales (revenue)", amount: revenue },
@@ -65,7 +67,12 @@ export default async function ExpensesPage() {
           : EXPENSE_LABEL[type] ?? type,
       amount: -v.amount,
     })),
-    { label: "Net profit", amount: net },
+    { label: "Net profit (before tax)", amount: net },
+    {
+      label: `Estimated tax set-aside (${Math.round(DEFAULT_TAX_RATE * 100)}%)`,
+      amount: -estTax,
+    },
+    { label: "Net after tax", amount: afterTax },
   ];
 
   return (
@@ -97,6 +104,7 @@ export default async function ExpensesPage() {
               {formatCurrency(net)}
             </span>
           }
+          sub={`${formatCurrency(afterTax)} after est. tax`}
         />
       </div>
 
