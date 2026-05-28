@@ -10,7 +10,7 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function AddExpenseForm() {
+export function AddExpenseForm({ mileageRate = MILEAGE_RATE }: { mileageRate?: number }) {
   const router = useRouter();
   const [type, setType] = useState<string>("supplies");
   const [date, setDate] = useState(today());
@@ -103,7 +103,7 @@ export function AddExpenseForm() {
       </div>
       {isMileage && (
         <p className="mt-2 text-xs text-muted">
-          Mileage is valued at the ${MILEAGE_RATE.toFixed(2)}/mi standard rate.
+          Mileage is valued at ${mileageRate.toFixed(2)}/mi (set in Settings).
         </p>
       )}
       <button

@@ -4,12 +4,14 @@ import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { realizedPnL } from "@/lib/analysis/deal";
 import { currentUserId, ownerWhere } from "@/lib/auth";
+import { getSettings } from "@/lib/settings";
 import { Stat } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const userId = await currentUserId();
+  const settings = await getSettings(userId);
   const items = await prisma.item.findMany({ where: ownerWhere(userId) });
   const now = new Date();
 
@@ -22,6 +24,7 @@ export default async function DashboardPage() {
       soldMarketplace: i.soldMarketplace,
       shippingCost: i.shippingCost,
       feesOverride: i.soldFees,
+      taxRate: settings.taxRate,
     })!,
   }));
 

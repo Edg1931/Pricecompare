@@ -12,14 +12,15 @@ export const EXPENSE_LABEL: Record<string, string> = {
   other: "Other",
 };
 
-/** Mileage entries derive their dollar amount from miles × the standard rate. */
+/** Mileage entries derive their dollar amount from miles × the rate. */
 export function expenseAmount(
   type: string,
   amount: number | null,
-  miles: number | null
+  miles: number | null,
+  rate: number = MILEAGE_RATE
 ): number {
   if (type === "mileage" && miles != null) {
-    return Math.round(miles * MILEAGE_RATE * 100) / 100;
+    return Math.round(miles * rate * 100) / 100;
   }
   return amount ?? 0;
 }
