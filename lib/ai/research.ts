@@ -118,6 +118,10 @@ Use web search to find comparable listings and recent sold prices across eBay, E
 
 PRIORITIZE recent eBay SOLD/completed listings — these are the most accurate comps for resale value. Search eBay's sold/completed results (e.g. eBay sold listings for the item) and include several with "listingType": "sold", the actual SOLD price, and the eBay item URL. Sold comps matter more than active asking prices, so include as many real sold comps as you can find.
 
+CONDITION MATTERS: this item is in ${ident.condition ?? "unknown"} condition. Prefer comps in the same or similar condition, and make your price reflect THIS item's condition — a worn/used item should be priced below mint/new comps. Note in marketContext if condition materially changes the value.
+
+Favor RECENT sales (last ~90 days) over older ones, since resale prices drift over time.
+
 Also estimate how this item's resale value has trended over time. Based on sold listings and demand, estimate the typical median SOLD price now, ~3 months ago, ~6 months ago, and ~1 year ago. These are best-effort estimates.
 
 Also assess demand: how quickly and reliably this item sells (sell-through), a realistic time-to-sell range, and whether there's a best time of year to sell it for top dollar.

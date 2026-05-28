@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ScanLine, LayoutGrid, Images, Wallet, Layers, Bell, BarChart3, LogOut, Settings } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getUser, ownerWhere } from "@/lib/auth";
+import { BottomNav } from "@/components/BottomNav";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -46,6 +47,7 @@ export default async function RootLayout({
               <span className="text-[15px]">Reseller</span>
             </Link>
             <nav className="flex items-center gap-1 text-sm">
+              <div className="hidden items-center gap-1 sm:flex">
               <Link
                 href="/"
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted transition hover:bg-surface hover:text-fg"
@@ -96,6 +98,7 @@ export default async function RootLayout({
               >
                 <ScanLine className="h-4 w-4" /> Scan
               </Link>
+              </div>
               <Link
                 href="/settings"
                 title="Settings"
@@ -117,7 +120,10 @@ export default async function RootLayout({
             </nav>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-28 sm:pb-6">
+          {children}
+        </main>
+        <BottomNav alertCount={alertCount} />
       </body>
     </html>
   );

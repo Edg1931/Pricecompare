@@ -117,6 +117,9 @@ export default async function ItemPage({
     "ebay",
     item.searchQuery || item.name
   );
+  const soldCompCount = item.comps.filter((c) => c.listingType === "sold").length;
+  const activeCompCount = item.comps.length - soldCompCount;
+  const compSources = [...new Set(item.comps.map((c) => sourceMeta(c.source).label))];
 
   return (
     <div className="space-y-6">
@@ -248,6 +251,25 @@ export default async function ItemPage({
               <p className="mt-4 text-sm leading-relaxed text-fg/90">
                 {item.analysisSummary}
               </p>
+            )}
+
+            {item.recommendedMedian !== null && (
+              <details className="mt-3 rounded-lg bg-surface-2/40 px-3 py-2">
+                <summary className="cursor-pointer text-xs font-medium text-muted">
+                  Why this price?
+                </summary>
+                <ul className="mt-2 space-y-1 text-xs text-muted">
+                  <li>
+                    {item.sampleSize} comps analyzed
+                    {soldCompCount > 0 ? ` · ${soldCompCount} sold (weighted higher)` : ""}
+                    {activeCompCount > 0 ? ` · ${activeCompCount} active` : ""}
+                  </li>
+                  {compSources.length > 0 && <li>Sources: {compSources.join(", ")}</li>}
+                  {item.condition && <li>Priced for {item.condition} condition</li>}
+                  <li>Search used: &ldquo;{item.searchQuery ?? item.name}&rdquo;</li>
+                  <li>Confidence: {Math.round((item.priceConfidence ?? 0) * 100)}%</li>
+                </ul>
+              </details>
             )}
           </Card>
 
