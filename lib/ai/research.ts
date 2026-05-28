@@ -203,6 +203,12 @@ CRITICAL accuracy rules for comps:
       price,
       currency: "USD",
       url: typeof obj.url === "string" ? obj.url : null,
+      imageUrl:
+        typeof obj.imageUrl === "string"
+          ? obj.imageUrl
+          : typeof obj.image === "string"
+            ? obj.image
+            : null,
       condition: typeof obj.condition === "string" ? obj.condition : null,
       listingType: obj.listingType === "sold" ? "sold" : "active",
     });

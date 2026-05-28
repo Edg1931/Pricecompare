@@ -1,7 +1,37 @@
 import { cn, formatCurrency } from "@/lib/utils";
 import { VERDICT_META, statusMeta } from "@/lib/display";
 import type { Demand, SourcingMetrics, Verdict } from "@/lib/types";
-import { TrendingUp, Gauge, CalendarClock, Clock } from "lucide-react";
+import { TrendingUp, Gauge, CalendarClock, Clock, ChevronDown } from "lucide-react";
+
+export function Collapsible({
+  title,
+  defaultOpen = false,
+  count,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="group rounded-2xl border border-border bg-surface/70 backdrop-blur-sm"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-5 font-semibold [&::-webkit-details-marker]:hidden">
+        <span>
+          {title}
+          {count !== undefined && (
+            <span className="ml-1 text-sm font-normal text-muted">({count})</span>
+          )}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted transition group-open:rotate-180" />
+      </summary>
+      <div className="px-5 pb-5">{children}</div>
+    </details>
+  );
+}
 
 export function DemandCard({ demand }: { demand: Demand }) {
   const score = demand.sellThroughScore;

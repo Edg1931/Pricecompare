@@ -67,6 +67,7 @@ export async function repriceItem(id: string): Promise<{ median: number | null }
           price: c.price,
           currency: c.currency ?? "USD",
           url: c.url ?? null,
+          imageUrl: c.imageUrl ?? null,
           condition: c.condition ?? null,
           listingType: c.listingType ?? "active",
         })),
