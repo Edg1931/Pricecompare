@@ -501,8 +501,7 @@ export default async function ItemPage({
 
       {/* Check the market */}
       {market.length > 0 && (
-        <Card className="p-5">
-          <h2 className="mb-1 font-semibold">Check the market yourself</h2>
+        <Collapsible title="Check the market yourself">
           <p className="mb-3 text-sm text-muted">
             Open a live search for &ldquo;{item.searchQuery ?? item.name}&rdquo; to
             verify prices or list it.
@@ -522,7 +521,7 @@ export default async function ItemPage({
               </a>
             ))}
           </div>
-        </Card>
+        </Collapsible>
       )}
 
       {/* Notes */}
