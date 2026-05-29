@@ -57,3 +57,26 @@ export async function readJson(res: Response): Promise<Record<string, unknown>> 
     throw new Error("Unexpected response from the server.");
   }
 }
+
+/**
+ * Sends a JSON mutation (POST/PATCH/DELETE) and throws a useful Error when the
+ * server responds non-OK, so callers can surface failures instead of silently
+ * showing success.
+ */
+export async function sendJson(
+  url: string,
+  method: "POST" | "PATCH" | "DELETE",
+  body?: unknown
+): Promise<Record<string, unknown>> {
+  const res = await fetch(url, {
+    method,
+    ...(body !== undefined
+      ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+      : {}),
+  });
+  return readJson(res);
+}
+
+export function errorMessage(err: unknown, fallback = "Something went wrong."): string {
+  return err instanceof Error ? err.message : fallback;
+}

@@ -13,7 +13,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { formatCurrency, timeAgo } from "@/lib/utils";
+import { formatCurrency, timeAgo, sendJson, errorMessage } from "@/lib/utils";
 import { VerdictBadge, StatusBadge } from "@/components/ui";
 import { STATUS_OPTIONS, statusMeta } from "@/lib/display";
 import type { Verdict } from "@/lib/types";
@@ -105,6 +105,7 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -122,29 +123,35 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
 
   async function applyStatus(newStatus: string) {
     setBusy(true);
-    await Promise.all(
-      [...selected].map((id) =>
-        fetch(`/api/items/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: newStatus }),
-        })
-      )
-    );
-    setBusy(false);
-    exitSelect();
-    router.refresh();
+    setError(null);
+    try {
+      await Promise.all(
+        [...selected].map((id) =>
+          sendJson(`/api/items/${id}`, "PATCH", { status: newStatus })
+        )
+      );
+      exitSelect();
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Some items couldn't be updated."));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function deleteSelected() {
     if (!confirm(`Delete ${selected.size} item${selected.size === 1 ? "" : "s"}?`)) return;
     setBusy(true);
-    await Promise.all(
-      [...selected].map((id) => fetch(`/api/items/${id}`, { method: "DELETE" }))
-    );
-    setBusy(false);
-    exitSelect();
-    router.refresh();
+    setError(null);
+    try {
+      await Promise.all([...selected].map((id) => sendJson(`/api/items/${id}`, "DELETE")));
+      exitSelect();
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Some items couldn't be deleted."));
+    } finally {
+      setBusy(false);
+    }
   }
 
   const visible = useMemo(() => {
@@ -228,6 +235,11 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </button>
           </div>
+          {error && (
+            <p className="w-full rounded-lg border border-over/40 bg-over/10 px-3 py-2 text-xs text-over">
+              {error}
+            </p>
+          )}
         </div>
       )}
 

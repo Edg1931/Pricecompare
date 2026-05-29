@@ -60,7 +60,10 @@ export default function ScanPage() {
         }),
       });
       const data = await readJson(res);
-      router.push(`/item/${data.id as string}`);
+      if (typeof data.id !== "string") {
+        throw new Error("The server didn't return a saved item. Please try again.");
+      }
+      router.push(`/item/${data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);

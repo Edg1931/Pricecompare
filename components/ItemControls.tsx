@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Trash2, Check, Pencil, X, Loader2, Bell, BellRing } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, sendJson, errorMessage } from "@/lib/utils";
 import { MARKETPLACES, marketplaceFee, realizedPnL } from "@/lib/analysis/deal";
 import { VoiceInput } from "@/components/VoiceInput";
 
@@ -40,6 +40,7 @@ interface FlipProps {
 export function FlipTracker(props: FlipProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [boughtOpen, setBoughtOpen] = useState(false);
   const [soldOpen, setSoldOpen] = useState(false);
 
@@ -65,15 +66,17 @@ export function FlipTracker(props: FlipProps) {
 
   async function patch(body: Record<string, unknown>) {
     setBusy(true);
-    await fetch(`/api/items/${props.itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setBusy(false);
-    setBoughtOpen(false);
-    setSoldOpen(false);
-    router.refresh();
+    setError(null);
+    try {
+      await sendJson(`/api/items/${props.itemId}`, "PATCH", body);
+      setBoughtOpen(false);
+      setSoldOpen(false);
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't save — please try again."));
+    } finally {
+      setBusy(false);
+    }
   }
 
   function clickStatus(key: string) {
@@ -180,10 +183,13 @@ export function FlipTracker(props: FlipProps) {
         </p>
       )}
 
+      {error && !boughtOpen && !soldOpen && <ErrorNote message={error} />}
+
       {/* Bought modal */}
       {boughtOpen && (
         <Modal title="Mark as bought" onClose={() => setBoughtOpen(false)}>
           <MoneyField label="What did you pay?" value={buyPrice} onChange={setBuyPrice} autoFocus />
+          {error && <ErrorNote message={error} />}
           <ModalActions
             busy={busy}
             onSave={() =>
@@ -251,6 +257,7 @@ export function FlipTracker(props: FlipProps) {
             </div>
           )}
 
+          {error && <ErrorNote message={error} />}
           <ModalActions
             busy={busy}
             saveLabel="Save sale"
@@ -268,6 +275,14 @@ export function FlipTracker(props: FlipProps) {
         </Modal>
       )}
     </div>
+  );
+}
+
+function ErrorNote({ message }: { message: string }) {
+  return (
+    <p className="rounded-lg border border-over/40 bg-over/10 px-3 py-2 text-xs text-over">
+      {message}
+    </p>
   );
 }
 
@@ -387,19 +402,24 @@ export function NotesEditor({
   const [value, setValue] = useState(initial ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const dirty = value !== (initial ?? "");
 
   async function save() {
     setSaving(true);
-    await fetch(`/api/items/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes: value.trim() === "" ? null : value }),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-    router.refresh();
+    setError(null);
+    try {
+      await sendJson(`/api/items/${itemId}`, "PATCH", {
+        notes: value.trim() === "" ? null : value,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't save notes."));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -411,6 +431,7 @@ export function NotesEditor({
         placeholder="Private notes — buy price, where you found it, condition details…"
         className="w-full resize-y rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-brand"
       />
+      {error && <ErrorNote message={error} />}
       <div className="mt-2 flex items-center justify-between">
         <VoiceInput
           onResult={(text) =>
@@ -445,18 +466,21 @@ export function AskingPriceEditor({
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initial?.toString() ?? "");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function save() {
     setSaving(true);
+    setError(null);
     const parsed = value.trim() === "" ? null : Number(value);
-    await fetch(`/api/items/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ askingPrice: parsed }),
-    });
-    setSaving(false);
-    setEditing(false);
-    router.refresh();
+    try {
+      await sendJson(`/api/items/${itemId}`, "PATCH", { askingPrice: parsed });
+      setEditing(false);
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't save price."));
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (!editing) {
@@ -472,27 +496,30 @@ export function AskingPriceEditor({
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center rounded-lg border border-border bg-surface-2 px-2">
-        <span className="text-muted">$</span>
-        <input
-          autoFocus
-          type="number"
-          inputMode="decimal"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && save()}
-          className="w-24 bg-transparent px-1 py-1.5 text-lg font-semibold outline-none"
-          placeholder="0"
-        />
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <div className="flex items-center rounded-lg border border-border bg-surface-2 px-2">
+          <span className="text-muted">$</span>
+          <input
+            autoFocus
+            type="number"
+            inputMode="decimal"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && save()}
+            className="w-24 bg-transparent px-1 py-1.5 text-lg font-semibold outline-none"
+            placeholder="0"
+          />
+        </div>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="grid h-9 w-9 place-items-center rounded-lg bg-brand text-white disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+        </button>
       </div>
-      <button
-        onClick={save}
-        disabled={saving}
-        className="grid h-9 w-9 place-items-center rounded-lg bg-brand text-white disabled:opacity-50"
-      >
-        <Check className="h-4 w-4" />
-      </button>
+      {error && <ErrorNote message={error} />}
     </div>
   );
 }
@@ -520,6 +547,7 @@ export function EditDetailsButton({ item }: { item: EditableItem }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState<null | "save" | "reprice">(null);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: item.name ?? "",
     brand: item.brand ?? "",
@@ -531,24 +559,26 @@ export function EditDetailsButton({ item }: { item: EditableItem }) {
 
   async function save(reprice: boolean) {
     setSaving(reprice ? "reprice" : "save");
-    const res = await fetch(`/api/items/${item.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    setError(null);
+    try {
+      await sendJson(`/api/items/${item.id}`, "PATCH", {
         name: form.name.trim() || item.name,
         brand: form.brand.trim() || null,
         model: form.model.trim() || null,
         category: form.category.trim() || null,
         condition: form.condition.trim() || null,
         searchQuery: form.searchQuery.trim() || null,
-      }),
-    });
-    if (res.ok && reprice) {
-      await fetch(`/api/items/${item.id}/reanalyze`, { method: "POST" });
+      });
+      if (reprice) {
+        await sendJson(`/api/items/${item.id}/reanalyze`, "POST");
+      }
+      setOpen(false);
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't save changes."));
+    } finally {
+      setSaving(null);
     }
-    setSaving(null);
-    setOpen(false);
-    router.refresh();
   }
 
   return (
@@ -595,6 +625,12 @@ export function EditDetailsButton({ item }: { item: EditableItem }) {
               improves accuracy.
             </p>
 
+            {error && (
+              <div className="mt-3">
+                <ErrorNote message={error} />
+              </div>
+            )}
+
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => save(false)}
@@ -638,19 +674,22 @@ export function AlertControl({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [direction, setDirection] = useState(alertDirection ?? "below");
   const [target, setTarget] = useState(alertTarget != null ? String(alertTarget) : "");
 
   async function patch(body: Record<string, unknown>) {
     setBusy(true);
-    await fetch(`/api/items/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setBusy(false);
-    setEditing(false);
-    router.refresh();
+    setError(null);
+    try {
+      await sendJson(`/api/items/${itemId}`, "PATCH", body);
+      setEditing(false);
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't update the alert."));
+    } finally {
+      setBusy(false);
+    }
   }
 
   const active = alertTarget != null;
@@ -681,6 +720,11 @@ export function AlertControl({
         >
           Remove
         </button>
+        {error && (
+          <div className="w-full">
+            <ErrorNote message={error} />
+          </div>
+        )}
       </div>
     );
   }
@@ -697,37 +741,40 @@ export function AlertControl({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-muted">Alert when est. price</span>
-      <select
-        value={direction}
-        onChange={(e) => setDirection(e.target.value)}
-        className="rounded-lg border border-border bg-surface-2 px-2 py-1.5 outline-none focus:border-brand"
-      >
-        <option value="below">drops below</option>
-        <option value="above">rises above</option>
-      </select>
-      <div className="flex items-center rounded-lg border border-border bg-surface-2 px-2">
-        <span className="text-muted">$</span>
-        <input
-          autoFocus
-          type="number"
-          inputMode="decimal"
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          className="w-20 bg-transparent px-1 py-1.5 outline-none"
-          placeholder="0"
-        />
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted">Alert when est. price</span>
+        <select
+          value={direction}
+          onChange={(e) => setDirection(e.target.value)}
+          className="rounded-lg border border-border bg-surface-2 px-2 py-1.5 outline-none focus:border-brand"
+        >
+          <option value="below">drops below</option>
+          <option value="above">rises above</option>
+        </select>
+        <div className="flex items-center rounded-lg border border-border bg-surface-2 px-2">
+          <span className="text-muted">$</span>
+          <input
+            autoFocus
+            type="number"
+            inputMode="decimal"
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            className="w-20 bg-transparent px-1 py-1.5 outline-none"
+            placeholder="0"
+          />
+        </div>
+        <button
+          onClick={() =>
+            patch({ alertTarget: target.trim() ? Number(target) : null, alertDirection: direction })
+          }
+          disabled={busy || !target.trim()}
+          className="grid h-8 w-8 place-items-center rounded-lg bg-brand text-white disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+        </button>
       </div>
-      <button
-        onClick={() =>
-          patch({ alertTarget: target.trim() ? Number(target) : null, alertDirection: direction })
-        }
-        disabled={busy || !target.trim()}
-        className="grid h-8 w-8 place-items-center rounded-lg bg-brand text-white disabled:opacity-50"
-      >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-      </button>
+      {error && <ErrorNote message={error} />}
     </div>
   );
 }
@@ -742,37 +789,45 @@ export function StorageEditor({
   const router = useRouter();
   const [value, setValue] = useState(initial ?? "");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const dirty = value !== (initial ?? "");
 
   async function save() {
     setSaving(true);
-    await fetch(`/api/items/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ storageLocation: value.trim() || null }),
-    });
-    setSaving(false);
-    router.refresh();
+    setError(null);
+    try {
+      await sendJson(`/api/items/${itemId}`, "PATCH", {
+        storageLocation: value.trim() || null,
+      });
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't save location."));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && dirty && save()}
-        placeholder="e.g. Bin A3, Shelf 2"
-        className="w-full rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm outline-none focus:border-brand"
-      />
-      {dirty && (
-        <button
-          onClick={save}
-          disabled={saving}
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand text-white disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-        </button>
-      )}
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && dirty && save()}
+          placeholder="e.g. Bin A3, Shelf 2"
+          className="w-full rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm outline-none focus:border-brand"
+        />
+        {dirty && (
+          <button
+            onClick={save}
+            disabled={saving}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand text-white disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          </button>
+        )}
+      </div>
+      {error && <ErrorNote message={error} />}
     </div>
   );
 }
@@ -784,12 +839,12 @@ export function DismissAlertButton({ itemId }: { itemId: string }) {
     <button
       onClick={async () => {
         setBusy(true);
-        await fetch(`/api/items/${itemId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dismissAlert: true }),
-        });
-        router.refresh();
+        try {
+          await sendJson(`/api/items/${itemId}`, "PATCH", { dismissAlert: true });
+          router.refresh();
+        } finally {
+          setBusy(false);
+        }
       }}
       disabled={busy}
       className="shrink-0 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted transition hover:text-fg disabled:opacity-50"
@@ -803,37 +858,52 @@ export function ItemActions({ itemId }: { itemId: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [reanalyzing, setReanalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function reanalyze() {
     setReanalyzing(true);
-    await fetch(`/api/items/${itemId}/reanalyze`, { method: "POST" });
-    setReanalyzing(false);
-    router.refresh();
+    setError(null);
+    try {
+      await sendJson(`/api/items/${itemId}/reanalyze`, "POST");
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Re-pricing failed."));
+    } finally {
+      setReanalyzing(false);
+    }
   }
 
   async function remove() {
     if (!confirm("Delete this item?")) return;
-    await fetch(`/api/items/${itemId}`, { method: "DELETE" });
-    startTransition(() => router.push("/"));
+    setError(null);
+    try {
+      await sendJson(`/api/items/${itemId}`, "DELETE");
+      startTransition(() => router.push("/"));
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't delete this item."));
+    }
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={reanalyze}
-        disabled={reanalyzing}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm font-medium transition hover:text-brand disabled:opacity-60"
-      >
-        <RefreshCw className={`h-4 w-4 ${reanalyzing ? "animate-spin" : ""}`} />
-        {reanalyzing ? "Re-pricing…" : "Re-analyze"}
-      </button>
-      <button
-        onClick={remove}
-        disabled={pending}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm font-medium text-muted transition hover:text-over disabled:opacity-60"
-      >
-        <Trash2 className="h-4 w-4" /> Delete
-      </button>
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={reanalyze}
+          disabled={reanalyzing}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm font-medium transition hover:text-brand disabled:opacity-60"
+        >
+          <RefreshCw className={`h-4 w-4 ${reanalyzing ? "animate-spin" : ""}`} />
+          {reanalyzing ? "Re-pricing…" : "Re-analyze"}
+        </button>
+        <button
+          onClick={remove}
+          disabled={pending}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm font-medium text-muted transition hover:text-over disabled:opacity-60"
+        >
+          <Trash2 className="h-4 w-4" /> Delete
+        </button>
+      </div>
+      {error && <ErrorNote message={error} />}
     </div>
   );
 }
