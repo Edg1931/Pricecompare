@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, X, Sparkles, Loader2, ScanBarcode } from "lucide-react";
-import { fileToDataUrl, dataUrlBytes } from "@/lib/image";
+import { fileToDataUrl } from "@/lib/image";
 import { readJson } from "@/lib/utils";
 import { BarcodeScanner, isBarcodeSupported } from "@/components/BarcodeScanner";
 import { VoiceInput } from "@/components/VoiceInput";
@@ -41,9 +41,11 @@ export default function ScanPage() {
 
   async function analyze() {
     if (images.length === 0) return;
-    const totalBytes = images.reduce((sum, src) => sum + dataUrlBytes(src), 0);
-    if (totalBytes > 4_000_000) {
-      setError("These photos are too large together — try fewer photos.");
+    // Measure the actual upload payload (the base64 data URLs as sent), not the
+    // decoded image size, so we stay under Vercel's ~4.5 MB request-body limit.
+    const payloadBytes = images.reduce((sum, src) => sum + src.length, 0);
+    if (payloadBytes > 4_300_000) {
+      setError("These photos are too large to upload together — remove one or two and try again.");
       return;
     }
     setLoading(true);
