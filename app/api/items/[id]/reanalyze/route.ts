@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { repriceItem } from "@/lib/reprice";
 import { hasAnthropic } from "@/lib/ai/client";
-import { currentUserId, ownerWhere } from "@/lib/auth";
+import { ownerScope, ownerWhere } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,9 +19,10 @@ export async function POST(
   }
 
   const { id } = await params;
-  const userId = await currentUserId();
+  const scope = await ownerScope();
+  if (!scope.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const owned = await prisma.item.findFirst({
-    where: { id, ...ownerWhere(userId) },
+    where: { id, ...ownerWhere(scope.userId) },
     select: { id: true },
   });
   if (!owned) return NextResponse.json({ error: "Not found" }, { status: 404 });

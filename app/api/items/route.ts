@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { analyzeFromImages, priceAndAnalyze } from "@/lib/analysis/pipeline";
 import { persistAnalysis } from "@/lib/item";
 import { hasAnthropic } from "@/lib/ai/client";
-import { currentUserId, ownerWhere } from "@/lib/auth";
+import { currentUserId, ownerScope, ownerWhere } from "@/lib/auth";
 import { authEnabled } from "@/lib/supabase/config";
 import type { ItemIdentification } from "@/lib/types";
 
@@ -96,9 +96,10 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  const userId = await currentUserId();
+  const scope = await ownerScope();
+  if (!scope.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const items = await prisma.item.findMany({
-    where: ownerWhere(userId),
+    where: ownerWhere(scope.userId),
     orderBy: { createdAt: "desc" },
     include: { photos: { orderBy: { order: "asc" }, take: 1 } },
   });

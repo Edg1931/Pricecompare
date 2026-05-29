@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { identifyLot } from "@/lib/ai/vision";
 import { hasAnthropic } from "@/lib/ai/client";
+import { ownerScope } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,6 +19,9 @@ export async function POST(req: Request) {
       { status: 503 }
     );
   }
+
+  const scope = await ownerScope();
+  if (!scope.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const parsed = schema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { analyzeDeal } from "@/lib/analysis/deal";
-import { currentUserId, ownerWhere } from "@/lib/auth";
+import { ownerScope, ownerWhere } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -32,9 +32,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const userId = await currentUserId();
+  const scope = await ownerScope();
+  if (!scope.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const item = await prisma.item.findFirst({
-    where: { id, ...ownerWhere(userId) },
+    where: { id, ...ownerWhere(scope.userId) },
     include: { photos: { orderBy: { order: "asc" } }, comps: true },
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -46,8 +47,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const userId = await currentUserId();
-  const existing = await prisma.item.findFirst({ where: { id, ...ownerWhere(userId) } });
+  const scope = await ownerScope();
+  if (!scope.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const existing = await prisma.item.findFirst({ where: { id, ...ownerWhere(scope.userId) } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const parsed = patchSchema.safeParse(await req.json().catch(() => ({})));
@@ -121,7 +123,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const userId = await currentUserId();
-  await prisma.item.deleteMany({ where: { id, ...ownerWhere(userId) } }).catch(() => null);
+  const scope = await ownerScope();
+  if (!scope.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await prisma.item.deleteMany({ where: { id, ...ownerWhere(scope.userId) } }).catch(() => null);
   return NextResponse.json({ ok: true });
 }
