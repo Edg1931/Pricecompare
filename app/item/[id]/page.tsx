@@ -34,6 +34,7 @@ import {
   ConfidenceBar,
   SourcingCard,
   DemandCard,
+  Collapsible,
 } from "@/components/ui";
 import { PriceGauge } from "@/components/PriceGauge";
 import { PhotoCarousel } from "@/components/PhotoCarousel";
@@ -460,6 +461,14 @@ export default async function ItemPage({
                         key={c.id}
                         className="flex items-center gap-3 rounded-lg border border-border bg-surface-2/40 px-3 py-2"
                       >
+                        {c.imageUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={c.imageUrl}
+                            alt=""
+                            className="h-9 w-9 shrink-0 rounded object-cover"
+                          />
+                        )}
                         <span className="font-semibold tabular-nums">
                           {formatCurrency(c.price, c.currency)}
                         </span>
@@ -492,8 +501,7 @@ export default async function ItemPage({
 
       {/* Check the market */}
       {market.length > 0 && (
-        <Card className="p-5">
-          <h2 className="mb-1 font-semibold">Check the market yourself</h2>
+        <Collapsible title="Check the market yourself">
           <p className="mb-3 text-sm text-muted">
             Open a live search for &ldquo;{item.searchQuery ?? item.name}&rdquo; to
             verify prices or list it.
@@ -513,7 +521,7 @@ export default async function ItemPage({
               </a>
             ))}
           </div>
-        </Card>
+        </Collapsible>
       )}
 
       {/* Notes */}
@@ -524,8 +532,7 @@ export default async function ItemPage({
 
       {/* Attributes */}
       {attributes.length > 0 && (
-        <Card className="p-5">
-          <h2 className="mb-3 font-semibold">Details</h2>
+        <Collapsible title="Details">
           <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
             {attributes.map((a, i) => (
               <div key={i}>
@@ -534,7 +541,7 @@ export default async function ItemPage({
               </div>
             ))}
           </dl>
-        </Card>
+        </Collapsible>
       )}
     </div>
   );

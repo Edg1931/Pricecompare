@@ -14,6 +14,7 @@ export interface RawComp {
   price: number;
   currency?: string;
   url?: string | null;
+  imageUrl?: string | null;
   condition?: string | null;
   listingType?: "active" | "sold";
 }

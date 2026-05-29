@@ -73,6 +73,8 @@ export async function searchEbay(query: string, limit = 20): Promise<RawComp[]> 
         title?: string;
         price?: { value?: string; currency?: string };
         itemWebUrl?: string;
+        image?: { imageUrl?: string };
+        thumbnailImages?: Array<{ imageUrl?: string }>;
         condition?: string;
       }>;
     };
@@ -87,6 +89,7 @@ export async function searchEbay(query: string, limit = 20): Promise<RawComp[]> 
           price,
           currency: it.price?.currency ?? "USD",
           url: it.itemWebUrl ?? null,
+          imageUrl: it.image?.imageUrl ?? it.thumbnailImages?.[0]?.imageUrl ?? null,
           condition: it.condition ?? null,
           listingType: "active",
         };

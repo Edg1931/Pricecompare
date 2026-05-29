@@ -133,6 +133,7 @@ model Comp {
   price       Float
   currency    String   @default("USD")
   url         String?
+  imageUrl    String?
   condition   String?
   listingType String   @default("active") // active | sold
   capturedAt  DateTime @default(now())
