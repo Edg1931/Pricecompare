@@ -38,7 +38,7 @@ folder (fine for local dev, but won't work on Vercel).
 ```bash
 npm install
 cp .env.example .env        # fill in Supabase + Anthropic values
-npm run db:push             # create tables in your Supabase Postgres
+npm run migrate:deploy      # apply migrations to your Supabase Postgres
 npm run dev                 # http://localhost:3000
 ```
 
@@ -49,9 +49,21 @@ npm run dev                 # http://localhost:3000
      into `DATABASE_URL` and `DIRECT_URL`.
    - Storage → create a **public** bucket named `item-photos`.
    - Project Settings → API → copy the URL and the **service_role** key.
-   - Run `npm run db:push` once (locally, with your `.env` filled in) to create the tables.
 2. **Vercel** — import the GitHub repo. Add all env vars above in Project → Settings →
-   Environment Variables. Deploy.
+   Environment Variables. Deploy. The build runs `prisma migrate deploy`, so the schema is
+   applied automatically on every deploy — no manual SQL.
+
+### Adopting migrations on an existing database
+
+If your database was created with the old `prisma db push` flow (tables already exist),
+baseline it **once** so Prisma knows the initial migration is already applied, then deploy:
+
+```bash
+npx prisma migrate resolve --applied 0_init   # mark the baseline as already in the DB
+npm run migrate:deploy                         # applies any newer migrations
+```
+
+Brand-new databases need no baseline — `migrate:deploy` creates everything from scratch.
 3. **On your phone** — open the Vercel HTTPS URL. The scan screen opens the camera
    directly; use the browser's "Add to Home Screen" to install it as an app. The same URL
    also works in the Inmo Air 3 browser.

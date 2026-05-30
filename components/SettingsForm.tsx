@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Check } from "lucide-react";
 import { MARKETPLACES } from "@/lib/analysis/deal";
+import { sendJson, errorMessage } from "@/lib/utils";
 
 export function SettingsForm({
   initial,
@@ -16,23 +17,26 @@ export function SettingsForm({
   const [marketplace, setMarketplace] = useState(initial.defaultMarketplace ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function save() {
     setSaving(true);
     setSaved(false);
-    await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    setError(null);
+    try {
+      await sendJson("/api/settings", "POST", {
         taxRate: Math.max(0, Math.min(95, Number(taxPct) || 0)) / 100,
         mileageRate: Number(mileage) || 0,
         defaultMarketplace: marketplace || null,
-      }),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-    router.refresh();
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't save settings."));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -101,6 +105,11 @@ export function SettingsForm({
         ) : null}
         {saving ? "Saving…" : saved ? "Saved" : "Save settings"}
       </button>
+      {error && (
+        <p className="rounded-lg border border-over/40 bg-over/10 px-3 py-2 text-xs text-over">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

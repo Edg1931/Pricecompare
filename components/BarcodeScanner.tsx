@@ -27,6 +27,14 @@ export function BarcodeScanner({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Hold the latest callback in a ref so the camera effect can stay mounted for
+  // the scanner's lifetime instead of tearing down the stream every time the
+  // parent re-renders with a fresh inline `onDetected`.
+  const onDetectedRef = useRef(onDetected);
+  useEffect(() => {
+    onDetectedRef.current = onDetected;
+  }, [onDetected]);
+
   useEffect(() => {
     let stream: MediaStream | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -45,7 +53,7 @@ export function BarcodeScanner({
         const codes = await detector.detect(videoRef.current);
         const code = codes[0]?.rawValue;
         if (code) {
-          onDetected(code);
+          onDetectedRef.current(code);
           return;
         }
       } catch {
@@ -74,7 +82,7 @@ export function BarcodeScanner({
       if (timer) clearTimeout(timer);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [onDetected]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4">

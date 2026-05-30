@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Loader2, FileSpreadsheet } from "lucide-react";
 import { EXPENSE_TYPES, EXPENSE_LABEL, MILEAGE_RATE } from "@/lib/expenses";
+import { sendJson, errorMessage } from "@/lib/utils";
 import { VoiceInput } from "@/components/VoiceInput";
 
 function today() {
@@ -18,27 +19,30 @@ export function AddExpenseForm({ mileageRate = MILEAGE_RATE }: { mileageRate?: n
   const [amount, setAmount] = useState("");
   const [miles, setMiles] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isMileage = type === "mileage";
 
   async function add() {
     setSaving(true);
-    await fetch("/api/expenses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    setError(null);
+    try {
+      await sendJson("/api/expenses", "POST", {
         type,
         date,
         description: description.trim() || null,
         amount: isMileage ? null : Number(amount) || 0,
         miles: isMileage ? Number(miles) || 0 : null,
-      }),
-    });
-    setSaving(false);
-    setDescription("");
-    setAmount("");
-    setMiles("");
-    router.refresh();
+      });
+      setDescription("");
+      setAmount("");
+      setMiles("");
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't add expense."));
+    } finally {
+      setSaving(false);
+    }
   }
 
   const valid = isMileage ? Number(miles) > 0 : Number(amount) > 0;
@@ -114,6 +118,11 @@ export function AddExpenseForm({ mileageRate = MILEAGE_RATE }: { mileageRate?: n
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         Add
       </button>
+      {error && (
+        <p className="mt-2 rounded-lg border border-over/40 bg-over/10 px-3 py-2 text-xs text-over">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -125,8 +134,12 @@ export function DeleteExpenseButton({ id }: { id: string }) {
     <button
       onClick={async () => {
         setBusy(true);
-        await fetch(`/api/expenses/${id}`, { method: "DELETE" });
-        router.refresh();
+        try {
+          await sendJson(`/api/expenses/${id}`, "DELETE");
+          router.refresh();
+        } finally {
+          setBusy(false);
+        }
       }}
       disabled={busy}
       className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted transition hover:text-over disabled:opacity-40"

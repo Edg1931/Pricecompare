@@ -5,6 +5,7 @@ import { ScanLine, LayoutGrid, Images, Wallet, Layers, Bell, BarChart3, LogOut, 
 import { prisma } from "@/lib/db";
 import { getUser, ownerWhere } from "@/lib/auth";
 import { BottomNav } from "@/components/BottomNav";
+import { OfflineSync } from "@/components/OfflineSync";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -124,6 +125,7 @@ export default async function RootLayout({
           {children}
         </main>
         <BottomNav alertCount={alertCount} />
+        <OfflineSync />
       </body>
     </html>
   );

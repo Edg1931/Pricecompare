@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, X, Sparkles, Loader2, ScanBarcode } from "lucide-react";
-import { fileToDataUrl, dataUrlBytes } from "@/lib/image";
+import { fileToDataUrl } from "@/lib/image";
 import { readJson } from "@/lib/utils";
+import { enqueueScan, notifyQueueChanged } from "@/lib/offline";
 import { BarcodeScanner, isBarcodeSupported } from "@/components/BarcodeScanner";
 import { VoiceInput } from "@/components/VoiceInput";
 
@@ -24,6 +25,7 @@ export default function ScanPage() {
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [queued, setQueued] = useState(false);
   const [scanning, setScanning] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -35,17 +37,38 @@ export default function ScanPage() {
 
   async function addFiles(files: FileList | null) {
     if (!files) return;
+    setQueued(false);
     const urls = await Promise.all(Array.from(files).map(fileToDataUrl));
     setImages((prev) => [...prev, ...urls].slice(0, 8));
   }
 
   async function analyze() {
     if (images.length === 0) return;
-    const totalBytes = images.reduce((sum, src) => sum + dataUrlBytes(src), 0);
-    if (totalBytes > 4_000_000) {
-      setError("These photos are too large together — try fewer photos.");
+    // Measure the actual upload payload (the base64 data URLs as sent), not the
+    // decoded image size, so we stay under Vercel's ~4.5 MB request-body limit.
+    const payloadBytes = images.reduce((sum, src) => sum + src.length, 0);
+    if (payloadBytes > 4_300_000) {
+      setError("These photos are too large to upload together — remove one or two and try again.");
       return;
     }
+    const askingPrice = asking.trim() ? Number(asking) : null;
+
+    // Offline: save the scan locally and let OfflineSync upload it on reconnect.
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      try {
+        await enqueueScan({ images, askingPrice, hint: hint.trim() || undefined });
+        notifyQueueChanged();
+        setImages([]);
+        setAsking("");
+        setHint("");
+        setError(null);
+        setQueued(true);
+      } catch {
+        setError("Couldn't save this scan offline. Please try again.");
+      }
+      return;
+    }
+
     setLoading(true);
     setStage(0);
     setError(null);
@@ -55,12 +78,15 @@ export default function ScanPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           images,
-          askingPrice: asking.trim() ? Number(asking) : null,
+          askingPrice,
           hint: hint.trim() || undefined,
         }),
       });
       const data = await readJson(res);
-      router.push(`/item/${data.id as string}`);
+      if (typeof data.id !== "string") {
+        throw new Error("The server didn't return a saved item. Please try again.");
+      }
+      router.push(`/item/${data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
@@ -211,6 +237,12 @@ export default function ScanPage() {
       {error && (
         <p className="rounded-xl border border-over/40 bg-over/10 px-4 py-3 text-sm text-over">
           {error}
+        </p>
+      )}
+
+      {queued && (
+        <p className="rounded-xl border border-brand/40 bg-brand/10 px-4 py-3 text-sm">
+          Saved offline. It&apos;ll analyze automatically once you&apos;re back online.
         </p>
       )}
 

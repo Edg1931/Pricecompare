@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { expenseAmount } from "@/lib/expenses";
-import { currentUserId, ownerWhere } from "@/lib/auth";
+import { currentUserId, ownerScope, ownerWhere } from "@/lib/auth";
 import { authEnabled } from "@/lib/supabase/config";
 import { getSettings } from "@/lib/settings";
 
@@ -17,9 +17,10 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  const userId = await currentUserId();
+  const scope = await ownerScope();
+  if (!scope.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const expenses = await prisma.expense.findMany({
-    where: ownerWhere(userId),
+    where: ownerWhere(scope.userId),
     orderBy: { date: "desc" },
   });
   return NextResponse.json({ expenses });
