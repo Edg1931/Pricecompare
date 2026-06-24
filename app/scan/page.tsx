@@ -165,7 +165,6 @@ export default function ScanPage() {
         ref={fileRef}
         type="file"
         accept="image/*"
-        capture="environment"
         multiple
         hidden
         onChange={(e) => addFiles(e.target.files)}
