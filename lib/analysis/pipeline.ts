@@ -30,13 +30,25 @@ export async function priceAndAnalyze(
   // doesn't add to the critical path (it would otherwise push us past
   // Vercel's 60s function limit). The listing only uses price for one
   // optional line, so it's fine to generate it without the median.
-  const [ebayActive, ebaySold, googleComps, research, listing] = await Promise.all([
+  // Use allSettled so a failure in one source (e.g. Anthropic timeout, eBay
+  // scope not approved) doesn't abort the whole analysis.
+  const settled = await Promise.allSettled([
     hasEbay() ? searchEbay(identification.searchQuery) : Promise.resolve([]),
     hasEbay() ? searchEbaySold(identification.searchQuery) : Promise.resolve([]),
     searchGoogleShopping(identification.searchQuery, 10),
     researchPrices(identification),
     generateListing(identification, null),
   ]);
+  const [ebayActiveR, ebaySoldR, googleCompsR, researchR, listingR] = settled;
+  const ebayActive  = ebayActiveR.status  === "fulfilled" ? ebayActiveR.value  : [];
+  const ebaySold    = ebaySoldR.status    === "fulfilled" ? ebaySoldR.value    : [];
+  const googleComps = googleCompsR.status === "fulfilled" ? googleCompsR.value : [];
+  const research    = researchR.status    === "fulfilled"
+    ? researchR.value
+    : { comps: [], marketContext: null, trend: null, demand: null };
+  const listing     = listingR.status     === "fulfilled" ? listingR.value     : null;
+  if (researchR.status === "rejected")  console.error("Research failed:",  researchR.reason);
+  if (listingR.status  === "rejected")  console.error("Listing gen failed:", listingR.reason);
 
   const comps = [...ebaySold, ...ebayActive, ...googleComps, ...research.comps];
   const aggregate = aggregatePrices(comps);

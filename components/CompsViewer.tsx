@@ -224,6 +224,8 @@ function CompTile({ comp: c }: { comp: CompForViewer }) {
             src={c.imageUrl}
             alt=""
             loading="lazy"
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
             className="h-full w-full object-cover transition group-hover:scale-105"
           />
         ) : (

@@ -197,7 +197,9 @@ export async function searchEbaySold(query: string, limit = 20): Promise<RawComp
           title: it.title ?? query,
           price,
           currency: it.lastSoldPrice?.currency ?? "USD",
-          url: it.itemWebUrl ?? null,
+          // Don't link to sold comps — eBay item URLs show the current/relisted
+          // listing price, not the historical sold price, which is misleading.
+          url: null,
           imageUrl: it.image?.imageUrl ?? it.thumbnailImages?.[0]?.imageUrl ?? null,
           condition: it.condition ?? null,
           listingType: "sold",
