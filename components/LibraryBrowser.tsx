@@ -297,14 +297,22 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
       )}
 
       {items.length === 0 ? (
-        <div className="grid place-items-center gap-3 rounded-2xl border border-border bg-surface/70 p-12 text-center">
+        <div className="grid place-items-center gap-4 rounded-2xl border border-border bg-surface/70 p-12 text-center">
           <div className="grid h-14 w-14 place-items-center rounded-2xl bg-surface-2">
             <TrendingUp className="h-7 w-7 text-muted" />
           </div>
           <div>
             <p className="font-medium">No items yet</p>
-            <p className="text-sm text-muted">Scan your first item to see what it&apos;s worth.</p>
+            <p className="text-sm text-muted">
+              Scan your first item to see what it&apos;s worth and whether you should buy it.
+            </p>
           </div>
+          <Link
+            href="/scan"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-brand to-brand-2 px-5 py-2.5 font-semibold text-white shadow-lg shadow-brand/30 transition hover:opacity-90"
+          >
+            Scan an item
+          </Link>
         </div>
       ) : visible.length === 0 ? (
         <p className="rounded-2xl border border-border bg-surface/70 p-8 text-center text-sm text-muted">

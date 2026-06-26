@@ -11,7 +11,7 @@ import {
   Trophy,
   Handshake,
   Search,
-  ImageOff,
+  Target,
 } from "lucide-react";
 import {
   getItem,
@@ -41,6 +41,7 @@ import { PriceGauge } from "@/components/PriceGauge";
 import { PhotoCarousel } from "@/components/PhotoCarousel";
 import { PriceHistoryCard } from "@/components/PriceHistory";
 import { CrossListCard } from "@/components/CrossList";
+import { CompsViewer } from "@/components/CompsViewer";
 import { CopyButton, ShareButton } from "@/components/Copyable";
 import {
   AskingPriceEditor,
@@ -109,12 +110,6 @@ export default async function ItemPage({
 
   // Only show comps backed by a real sold/live listing (a verifiable link).
   const realComps = item.comps.filter((c) => c.url);
-  const grouped = new Map<string, typeof item.comps>();
-  for (const c of realComps) {
-    const arr = grouped.get(c.source) ?? [];
-    arr.push(c);
-    grouped.set(c.source, arr);
-  }
   const marketSearchUrl = searchUrlForSource(
     "ebay",
     item.searchQuery || item.name
@@ -238,6 +233,23 @@ export default async function ItemPage({
               )}
             </div>
 
+            {neg && neg.maxBuy != null && (
+              <div className="mt-4 flex items-center gap-3 rounded-xl border border-steal/30 bg-steal/5 px-4 py-3">
+                <Target className="h-5 w-5 shrink-0 text-steal" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs uppercase tracking-wide text-muted">
+                    Max to pay
+                  </div>
+                  <div className="text-2xl font-bold tabular-nums text-steal">
+                    {formatCurrency(neg.maxBuy)}
+                  </div>
+                </div>
+                <div className="hidden text-right text-[11px] leading-tight text-muted sm:block">
+                  Above this, the<br />numbers stop working
+                </div>
+              </div>
+            )}
+
             {item.recommendedMedian !== null && (
               <div className="mt-5">
                 <PriceGauge
@@ -319,79 +331,7 @@ export default async function ItemPage({
             current prices, or re-analyze.
           </p>
         ) : (
-          <div className="space-y-5">
-            {[...grouped.entries()].map(([source, comps]) => {
-              const meta = sourceMeta(source);
-              return (
-                <div key={source}>
-                  <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                    <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
-                    {meta.label}
-                    <span className="text-xs text-muted">({comps.length})</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-                    {comps.map((c) => {
-                      const inner = (
-                        <>
-                          <div className="relative aspect-square w-full overflow-hidden bg-surface">
-                            {c.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={c.imageUrl}
-                                alt=""
-                                loading="lazy"
-                                className="h-full w-full object-cover transition group-hover:scale-105"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-muted">
-                                <ImageOff className="h-6 w-6" />
-                              </div>
-                            )}
-                            {c.listingType === "sold" && (
-                              <span className="absolute right-1.5 top-1.5 rounded bg-steal px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white shadow">
-                                sold
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-0.5 px-2 py-1.5">
-                            <div className="flex items-center justify-between gap-1.5">
-                              <span className="font-semibold tabular-nums">
-                                {formatCurrency(c.price, c.currency)}
-                              </span>
-                              {c.url && (
-                                <ExternalLink className="h-3 w-3 shrink-0 text-muted transition group-hover:text-brand" />
-                              )}
-                            </div>
-                            <span className="line-clamp-2 text-xs leading-snug text-muted">
-                              {c.title}
-                            </span>
-                          </div>
-                        </>
-                      );
-                      const tileClass =
-                        "group flex flex-col overflow-hidden rounded-lg border border-border bg-surface-2/40 transition hover:border-brand hover:bg-surface-2";
-                      return c.url ? (
-                        <a
-                          key={c.id}
-                          href={c.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={c.title}
-                          className={tileClass}
-                        >
-                          {inner}
-                        </a>
-                      ) : (
-                        <div key={c.id} className={tileClass}>
-                          {inner}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <CompsViewer comps={realComps} itemCondition={item.condition} />
         )}
       </Card>
 
