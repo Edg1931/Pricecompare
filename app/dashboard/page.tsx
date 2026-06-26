@@ -6,6 +6,7 @@ import { realizedPnL } from "@/lib/analysis/deal";
 import { currentUserId, ownerWhere } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { Stat } from "@/components/ui";
+import { TaxExport } from "@/components/TaxExport";
 
 export const dynamic = "force-dynamic";
 
@@ -180,6 +181,16 @@ export default async function DashboardPage() {
             value={<span className={aging > 0 ? "text-over" : ""}>{aging}</span>}
           />
         </div>
+      </section>
+
+      {/* Tax export — Schedule C reconciliation CSV */}
+      <section className="rounded-2xl border border-border bg-surface/70 p-5">
+        <TaxExport currentYear={now.getFullYear()} />
+        <p className="mt-3 text-xs text-muted">
+          Revenue, COGS, fees, mileage, and other expenses for sold items in the
+          selected year, formatted against Schedule C lines for self-employment
+          tax filing. Open the CSV in Excel or Google Sheets.
+        </p>
       </section>
     </div>
   );
