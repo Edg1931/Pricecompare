@@ -11,6 +11,7 @@ import {
   Trophy,
   Handshake,
   Search,
+  ImageOff,
 } from "lucide-react";
 import {
   getItem,
@@ -286,6 +287,7 @@ export default async function ItemPage({
         </div>
       </div>
 
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
       {/* Sourcing / ROI */}
       {sourcing && <SourcingCard metrics={sourcing} />}
 
@@ -414,7 +416,7 @@ export default async function ItemPage({
       <CrossListCard listings={crossListings} />
 
       {/* Comparable listings */}
-      <Card className="p-5">
+      <Card className="p-5 lg:col-span-2">
         <div className="mb-1 flex items-center justify-between gap-2">
           <h2 className="font-semibold">
             Comparable listings{" "}
@@ -445,52 +447,74 @@ export default async function ItemPage({
             current prices, or re-analyze.
           </p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {[...grouped.entries()].map(([source, comps]) => {
               const meta = sourceMeta(source);
               return (
                 <div key={source}>
-                  <div className="mb-1.5 flex items-center gap-2 text-sm font-medium">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                     <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
                     {meta.label}
                     <span className="text-xs text-muted">({comps.length})</span>
                   </div>
-                  <div className="space-y-1.5">
-                    {comps.map((c) => (
-                      <div
-                        key={c.id}
-                        className="flex items-center gap-3 rounded-lg border border-border bg-surface-2/40 px-3 py-2"
-                      >
-                        {c.imageUrl && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={c.imageUrl}
-                            alt=""
-                            className="h-9 w-9 shrink-0 rounded object-cover"
-                          />
-                        )}
-                        <span className="font-semibold tabular-nums">
-                          {formatCurrency(c.price, c.currency)}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-sm text-muted">
-                          {c.title}
-                        </span>
-                        {c.listingType === "sold" && (
-                          <span className="rounded bg-steal/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-steal">
-                            sold
-                          </span>
-                        )}
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+                    {comps.map((c) => {
+                      const inner = (
+                        <>
+                          <div className="relative aspect-square w-full overflow-hidden bg-surface">
+                            {c.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={c.imageUrl}
+                                alt=""
+                                loading="lazy"
+                                className="h-full w-full object-cover transition group-hover:scale-105"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-muted">
+                                <ImageOff className="h-6 w-6" />
+                              </div>
+                            )}
+                            {c.listingType === "sold" && (
+                              <span className="absolute right-1.5 top-1.5 rounded bg-steal px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white shadow">
+                                sold
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-0.5 px-2 py-1.5">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="font-semibold tabular-nums">
+                                {formatCurrency(c.price, c.currency)}
+                              </span>
+                              {c.url && (
+                                <ExternalLink className="h-3 w-3 shrink-0 text-muted transition group-hover:text-brand" />
+                              )}
+                            </div>
+                            <span className="line-clamp-2 text-xs leading-snug text-muted">
+                              {c.title}
+                            </span>
+                          </div>
+                        </>
+                      );
+                      const tileClass =
+                        "group flex flex-col overflow-hidden rounded-lg border border-border bg-surface-2/40 transition hover:border-brand hover:bg-surface-2";
+                      return c.url ? (
                         <a
-                          href={c.url!}
+                          key={c.id}
+                          href={c.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title="View this listing"
-                          className="text-muted transition hover:text-brand"
+                          title={c.title}
+                          className={tileClass}
                         >
-                          <ExternalLink className="h-4 w-4" />
+                          {inner}
                         </a>
-                      </div>
-                    ))}
+                      ) : (
+                        <div key={c.id} className={tileClass}>
+                          {inner}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -532,17 +556,20 @@ export default async function ItemPage({
 
       {/* Attributes */}
       {attributes.length > 0 && (
-        <Collapsible title="Details">
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-            {attributes.map((a, i) => (
-              <div key={i}>
-                <dt className="text-xs uppercase tracking-wide text-muted">{a.label}</dt>
-                <dd className="font-medium">{a.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </Collapsible>
+        <div className="lg:col-span-2">
+          <Collapsible title="Details">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+              {attributes.map((a, i) => (
+                <div key={i}>
+                  <dt className="text-xs uppercase tracking-wide text-muted">{a.label}</dt>
+                  <dd className="font-medium">{a.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </Collapsible>
+        </div>
       )}
+      </div>
     </div>
   );
 }
