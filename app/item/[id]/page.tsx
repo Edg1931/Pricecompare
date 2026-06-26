@@ -287,136 +287,8 @@ export default async function ItemPage({
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-      {/* Sourcing / ROI */}
-      {sourcing && <SourcingCard metrics={sourcing} />}
-
-      {/* Negotiation assistant */}
-      {neg && (
-        <Card className="p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Handshake className="h-4 w-4 text-accent" />
-            <h2 className="font-semibold">Negotiation assistant</h2>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-border bg-surface-2/50 px-4 py-3">
-              <div className="text-xs uppercase tracking-wide text-muted">
-                Opening offer
-              </div>
-              <div className="mt-0.5 text-xl font-semibold tabular-nums">
-                {formatCurrency(neg.opening)}
-              </div>
-            </div>
-            <div className="rounded-xl border border-border bg-surface-2/50 px-4 py-3">
-              <div className="text-xs uppercase tracking-wide text-muted">
-                Walk-away max
-              </div>
-              <div className="mt-0.5 text-xl font-semibold tabular-nums">
-                {formatCurrency(neg.maxBuy)}
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 rounded-lg bg-surface-2 px-3 py-2">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs uppercase tracking-wide text-muted">Script</span>
-              <CopyButton text={neg.script} />
-            </div>
-            <p className="text-sm leading-relaxed text-fg/90">{neg.script}</p>
-          </div>
-        </Card>
-      )}
-
-      {/* Demand & sell-through */}
-      {demand && <DemandCard demand={demand} />}
-
-      {/* Price history & trend */}
-      <PriceHistoryCard trend={priceTrend} snapshots={snapshots} />
-
-      {/* Best platform + net proceeds */}
-      {netProceeds.length > 0 && (
-        <Card className="p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-fair" />
-            <h2 className="font-semibold">Where to sell it</h2>
-            {item.bestPlatform && (
-              <span className="ml-auto rounded-full bg-steal/15 px-2.5 py-1 text-xs font-semibold text-steal">
-                Best: {item.bestPlatform}
-              </span>
-            )}
-          </div>
-          <p className="mb-4 text-xs text-muted">
-            Estimated take-home at the median resale price of{" "}
-            {formatCurrency(item.recommendedMedian)} (after typical seller fees).
-          </p>
-          <div className="space-y-2">
-            {netProceeds.map((p) => {
-              const max = netProceeds[0].net || 1;
-              return (
-                <div key={p.platform} className="flex items-center gap-3">
-                  <div className="w-40 shrink-0 text-sm">{p.platform}</div>
-                  <div className="h-6 flex-1 overflow-hidden rounded-md bg-surface-2">
-                    <div
-                      className="h-full rounded-md bg-gradient-to-r from-brand/70 to-accent/70"
-                      style={{ width: `${Math.max(8, (p.net / max) * 100)}%` }}
-                    />
-                  </div>
-                  <div className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums">
-                    {formatCurrency(p.net)}
-                  </div>
-                  <div className="hidden w-14 shrink-0 text-right text-xs text-muted sm:block">
-                    {Math.round(p.feePct * 100)}% fee
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      {/* Listing kit */}
-      {(item.listingTitle || item.listingDescription) && (
-        <Card className="p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-accent" />
-            <h2 className="font-semibold">Ready-to-post listing</h2>
-            {fullListing && (
-              <span className="ml-auto">
-                <CopyButton text={fullListing} label="Copy all" />
-              </span>
-            )}
-          </div>
-          {item.listingTitle && (
-            <div className="mb-3">
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wide text-muted">Title</span>
-                <CopyButton text={item.listingTitle} />
-              </div>
-              <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-medium">
-                {item.listingTitle}
-              </p>
-            </div>
-          )}
-          {item.listingDescription && (
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wide text-muted">
-                  Description
-                </span>
-                <CopyButton text={item.listingDescription} />
-              </div>
-              <p className="whitespace-pre-wrap rounded-lg bg-surface-2 px-3 py-2 text-sm leading-relaxed text-fg/90">
-                {item.listingDescription}
-              </p>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Cross-list drafts */}
-      <CrossListCard listings={crossListings} />
-
-      {/* Comparable listings */}
-      <Card className="p-5 lg:col-span-2">
+      {/* Comparable listings — pulled up high since these are the evidence */}
+      <Card className="p-5">
         <div className="mb-1 flex items-center justify-between gap-2">
           <h2 className="font-semibold">
             Comparable listings{" "}
@@ -523,53 +395,186 @@ export default async function ItemPage({
         )}
       </Card>
 
-      {/* Check the market */}
-      {market.length > 0 && (
-        <Collapsible title="Check the market yourself">
-          <p className="mb-3 text-sm text-muted">
-            Open a live search for &ldquo;{item.searchQuery ?? item.name}&rdquo; to
-            verify prices or list it.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {market.map((m) => (
-              <a
-                key={m.label}
-                href={m.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm font-medium transition hover:border-brand hover:text-brand"
-              >
-                <span className={`h-2 w-2 rounded-full ${m.dot}`} />
-                {m.label}
-                <ExternalLink className="h-3.5 w-3.5 text-muted" />
-              </a>
-            ))}
-          </div>
-        </Collapsible>
-      )}
+      {/* Two manually-curated columns: each flows top-to-bottom independently,
+          so cards with different heights can't create dead space mid-row.
+          Left = decisions for buying. Right = actions for selling. */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-6">
+          {/* Sourcing / ROI */}
+          {sourcing && <SourcingCard metrics={sourcing} />}
 
-      {/* Notes */}
+          {/* Negotiation assistant */}
+          {neg && (
+            <Card className="p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Handshake className="h-4 w-4 text-accent" />
+                <h2 className="font-semibold">Negotiation assistant</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-border bg-surface-2/50 px-4 py-3">
+                  <div className="text-xs uppercase tracking-wide text-muted">
+                    Opening offer
+                  </div>
+                  <div className="mt-0.5 text-xl font-semibold tabular-nums">
+                    {formatCurrency(neg.opening)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-surface-2/50 px-4 py-3">
+                  <div className="text-xs uppercase tracking-wide text-muted">
+                    Walk-away max
+                  </div>
+                  <div className="mt-0.5 text-xl font-semibold tabular-nums">
+                    {formatCurrency(neg.maxBuy)}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 rounded-lg bg-surface-2 px-3 py-2">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-xs uppercase tracking-wide text-muted">Script</span>
+                  <CopyButton text={neg.script} />
+                </div>
+                <p className="text-sm leading-relaxed text-fg/90">{neg.script}</p>
+              </div>
+            </Card>
+          )}
+
+          {/* Demand & sell-through */}
+          {demand && <DemandCard demand={demand} />}
+
+          {/* Price history & trend */}
+          <PriceHistoryCard trend={priceTrend} snapshots={snapshots} />
+        </div>
+
+        <div className="space-y-6">
+          {/* Best platform + net proceeds */}
+          {netProceeds.length > 0 && (
+            <Card className="p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-fair" />
+                <h2 className="font-semibold">Where to sell it</h2>
+                {item.bestPlatform && (
+                  <span className="ml-auto rounded-full bg-steal/15 px-2.5 py-1 text-xs font-semibold text-steal">
+                    Best: {item.bestPlatform}
+                  </span>
+                )}
+              </div>
+              <p className="mb-4 text-xs text-muted">
+                Estimated take-home at the median resale price of{" "}
+                {formatCurrency(item.recommendedMedian)} (after typical seller fees).
+              </p>
+              <div className="space-y-2">
+                {netProceeds.map((p) => {
+                  const max = netProceeds[0].net || 1;
+                  return (
+                    <div key={p.platform} className="flex items-center gap-3">
+                      <div className="w-32 shrink-0 text-sm">{p.platform}</div>
+                      <div className="h-6 flex-1 overflow-hidden rounded-md bg-surface-2">
+                        <div
+                          className="h-full rounded-md bg-gradient-to-r from-brand/70 to-accent/70"
+                          style={{ width: `${Math.max(8, (p.net / max) * 100)}%` }}
+                        />
+                      </div>
+                      <div className="w-20 shrink-0 text-right text-sm font-semibold tabular-nums">
+                        {formatCurrency(p.net)}
+                      </div>
+                      <div className="hidden w-12 shrink-0 text-right text-xs text-muted sm:block">
+                        {Math.round(p.feePct * 100)}% fee
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {/* Listing kit */}
+          {(item.listingTitle || item.listingDescription) && (
+            <Card className="p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-accent" />
+                <h2 className="font-semibold">Ready-to-post listing</h2>
+                {fullListing && (
+                  <span className="ml-auto">
+                    <CopyButton text={fullListing} label="Copy all" />
+                  </span>
+                )}
+              </div>
+              {item.listingTitle && (
+                <div className="mb-3">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-wide text-muted">Title</span>
+                    <CopyButton text={item.listingTitle} />
+                  </div>
+                  <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-medium">
+                    {item.listingTitle}
+                  </p>
+                </div>
+              )}
+              {item.listingDescription && (
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-wide text-muted">
+                      Description
+                    </span>
+                    <CopyButton text={item.listingDescription} />
+                  </div>
+                  <p className="whitespace-pre-wrap rounded-lg bg-surface-2 px-3 py-2 text-sm leading-relaxed text-fg/90">
+                    {item.listingDescription}
+                  </p>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Cross-list drafts */}
+          <CrossListCard listings={crossListings} />
+
+          {/* Check the market */}
+          {market.length > 0 && (
+            <Collapsible title="Check the market yourself">
+              <p className="mb-3 text-sm text-muted">
+                Open a live search for &ldquo;{item.searchQuery ?? item.name}&rdquo; to
+                verify prices or list it.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {market.map((m) => (
+                  <a
+                    key={m.label}
+                    href={m.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm font-medium transition hover:border-brand hover:text-brand"
+                  >
+                    <span className={`h-2 w-2 rounded-full ${m.dot}`} />
+                    {m.label}
+                    <ExternalLink className="h-3.5 w-3.5 text-muted" />
+                  </a>
+                ))}
+              </div>
+            </Collapsible>
+          )}
+        </div>
+      </div>
+
+      {/* Notes — full width below the columns */}
       <Card className="p-5">
         <h2 className="mb-3 font-semibold">Notes</h2>
         <NotesEditor itemId={item.id} initial={item.notes} />
       </Card>
 
-      {/* Attributes */}
+      {/* Attributes — full width */}
       {attributes.length > 0 && (
-        <div className="lg:col-span-2">
-          <Collapsible title="Details">
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-              {attributes.map((a, i) => (
-                <div key={i}>
-                  <dt className="text-xs uppercase tracking-wide text-muted">{a.label}</dt>
-                  <dd className="font-medium">{a.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </Collapsible>
-        </div>
+        <Collapsible title="Details">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3 md:grid-cols-4">
+            {attributes.map((a, i) => (
+              <div key={i}>
+                <dt className="text-xs uppercase tracking-wide text-muted">{a.label}</dt>
+                <dd className="font-medium">{a.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </Collapsible>
       )}
-      </div>
     </div>
   );
 }
