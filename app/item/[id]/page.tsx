@@ -108,12 +108,12 @@ export default async function ItemPage({
       ? negotiation(item.recommendedMedian, item.askingPrice)
       : null;
 
-  // Only show comps backed by a real sold/live listing (a verifiable link).
-  // Explicitly map to CompForViewer so the similarity field (added by migration)
-  // is included even before Prisma client is regenerated.
+  // Show comps that have a URL or an image. Sold comps from eBay Insights have
+  // images but intentionally no URL (the eBay URL shows the relisted price, not
+  // the historical sold price). Explicitly map to include similarity.
   const rawComps = item.comps as Array<(typeof item.comps)[number] & { similarity?: number | null }>;
   const realComps = rawComps
-    .filter((c) => c.url)
+    .filter((c) => c.url || c.imageUrl)
     .map((c) => ({
       id: c.id,
       source: c.source,
