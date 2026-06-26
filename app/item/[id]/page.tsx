@@ -109,7 +109,23 @@ export default async function ItemPage({
       : null;
 
   // Only show comps backed by a real sold/live listing (a verifiable link).
-  const realComps = item.comps.filter((c) => c.url);
+  // Explicitly map to CompForViewer so the similarity field (added by migration)
+  // is included even before Prisma client is regenerated.
+  const rawComps = item.comps as Array<(typeof item.comps)[number] & { similarity?: number | null }>;
+  const realComps = rawComps
+    .filter((c) => c.url)
+    .map((c) => ({
+      id: c.id,
+      source: c.source,
+      title: c.title,
+      price: c.price,
+      currency: c.currency,
+      url: c.url,
+      imageUrl: c.imageUrl,
+      condition: c.condition,
+      listingType: c.listingType,
+      similarity: c.similarity ?? null,
+    }));
   const marketSearchUrl = searchUrlForSource(
     "ebay",
     item.searchQuery || item.name
@@ -331,7 +347,11 @@ export default async function ItemPage({
             current prices, or re-analyze.
           </p>
         ) : (
-          <CompsViewer comps={realComps} itemCondition={item.condition} />
+          <CompsViewer
+          comps={realComps}
+          itemCondition={item.condition}
+          itemId={item.id}
+        />
         )}
       </Card>
 
