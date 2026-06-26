@@ -128,7 +128,7 @@ model Comp {
   id          String   @id @default(cuid())
   itemId      String
   item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  source      String // ebay | etsy | mercari | facebook | swappa | poshmark | stockx | web
+  source      String // ebay | etsy | mercari | facebook | swappa | poshmark | stockx | web | google
   title       String
   price       Float
   currency    String   @default("USD")
@@ -136,6 +136,7 @@ model Comp {
   imageUrl    String?
   condition   String?
   listingType String   @default("active") // active | sold
+  similarity  Int?     // 0-100 visual match score vs item photos (set by rank-similarity)
   capturedAt  DateTime @default(now())
 
   @@index([itemId])

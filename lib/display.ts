@@ -44,6 +44,7 @@ export const SOURCE_META: Record<string, { label: string; dot: string }> = {
   poshmark: { label: "Poshmark", dot: "bg-pink-400" },
   stockx: { label: "StockX", dot: "bg-lime-400" },
   web: { label: "Web", dot: "bg-violet-400" },
+  google: { label: "Google Shopping", dot: "bg-green-400" },
 };
 
 export function sourceMeta(source: string) {

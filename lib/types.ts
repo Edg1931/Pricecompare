@@ -6,7 +6,8 @@ export type CompSource =
   | "swappa"
   | "poshmark"
   | "stockx"
-  | "web";
+  | "web"
+  | "google";
 
 export interface RawComp {
   source: CompSource;

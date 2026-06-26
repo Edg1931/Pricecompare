@@ -3,6 +3,7 @@ import { identifyItem } from "@/lib/ai/vision";
 import { researchPrices } from "@/lib/ai/research";
 import { generateListing } from "@/lib/ai/listing";
 import { searchEbay, searchEbaySold, hasEbay } from "@/lib/pricing/ebay";
+import { searchGoogleShopping } from "@/lib/pricing/google";
 import { aggregatePrices } from "@/lib/pricing/aggregate";
 import { analyzeDeal } from "@/lib/analysis/deal";
 
@@ -29,14 +30,15 @@ export async function priceAndAnalyze(
   // doesn't add to the critical path (it would otherwise push us past
   // Vercel's 60s function limit). The listing only uses price for one
   // optional line, so it's fine to generate it without the median.
-  const [ebayActive, ebaySold, research, listing] = await Promise.all([
+  const [ebayActive, ebaySold, googleComps, research, listing] = await Promise.all([
     hasEbay() ? searchEbay(identification.searchQuery) : Promise.resolve([]),
     hasEbay() ? searchEbaySold(identification.searchQuery) : Promise.resolve([]),
+    searchGoogleShopping(identification.searchQuery, 10),
     researchPrices(identification),
     generateListing(identification, null),
   ]);
 
-  const comps = [...ebaySold, ...ebayActive, ...research.comps];
+  const comps = [...ebaySold, ...ebayActive, ...googleComps, ...research.comps];
   const aggregate = aggregatePrices(comps);
   const deal = analyzeDeal(aggregate.median, askingPrice);
 

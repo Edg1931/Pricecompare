@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ExternalLink, ImageOff } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ExternalLink, ImageOff, Sparkles } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
 
@@ -15,19 +15,71 @@ export type CompForViewer = {
   imageUrl: string | null;
   condition: string | null;
   listingType: string | null;
+  similarity: number | null;
 };
 
 type Filter = "all" | "sold" | "active";
 
+function simBadge(score: number): { label: string; cls: string } {
+  if (score >= 80) return { label: `${score}% match`, cls: "bg-steal text-white" };
+  if (score >= 50) return { label: `${score}% match`, cls: "bg-fair text-white" };
+  return { label: `${score}%`, cls: "bg-surface border border-border text-muted" };
+}
+
 export function CompsViewer({
-  comps,
+  comps: initialComps,
   itemCondition,
+  itemId,
 }: {
   comps: CompForViewer[];
   itemCondition: string | null;
+  itemId: string;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [matchCondition, setMatchCondition] = useState(false);
+  const [simScores, setSimScores] = useState<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    for (const c of initialComps) {
+      if (c.similarity != null) map[c.id] = c.similarity;
+    }
+    return map;
+  });
+  const [rankingState, setRankingState] = useState<"idle" | "loading" | "done">(
+    () => {
+      // If all image comps already have similarity, skip auto-ranking
+      const imageComps = initialComps.filter((c) => c.imageUrl);
+      if (imageComps.length === 0) return "done";
+      const allRanked = imageComps.every((c) => c.similarity != null);
+      return allRanked ? "done" : "idle";
+    }
+  );
+  const rankedRef = useRef(false);
+
+  // Auto-rank on first mount when image comps lack similarity scores
+  useEffect(() => {
+    if (rankingState !== "idle" || rankedRef.current) return;
+    rankedRef.current = true;
+    setRankingState("loading");
+
+    fetch(`/api/items/${itemId}/rank-similarity`, { method: "POST" })
+      .then((r) => r.json())
+      .then((data: { scores?: Record<string, number> }) => {
+        if (data.scores) {
+          setSimScores((prev) => ({ ...prev, ...data.scores }));
+        }
+        setRankingState("done");
+      })
+      .catch(() => setRankingState("done"));
+  }, [rankingState, itemId]);
+
+  const comps = useMemo(
+    () =>
+      initialComps.map((c) => ({
+        ...c,
+        similarity: simScores[c.id] ?? c.similarity,
+      })),
+    [initialComps, simScores]
+  );
 
   const soldCount = useMemo(
     () => comps.filter((c) => c.listingType === "sold").length,
@@ -96,6 +148,11 @@ export function CompsViewer({
             Match <span className="text-fg">{itemCondition}</span> only
           </label>
         )}
+        {rankingState === "loading" && (
+          <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted animate-pulse">
+            <Sparkles className="h-3 w-3" /> Ranking visual similarity…
+          </span>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -156,6 +213,8 @@ function FilterPill({
 }
 
 function CompTile({ comp: c }: { comp: CompForViewer }) {
+  const badge = c.similarity != null ? simBadge(c.similarity) : null;
+
   const inner = (
     <>
       <div className="relative aspect-square w-full overflow-hidden bg-surface">
@@ -175,6 +234,13 @@ function CompTile({ comp: c }: { comp: CompForViewer }) {
         {c.listingType === "sold" && (
           <span className="absolute right-1.5 top-1.5 rounded bg-steal px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white shadow">
             sold
+          </span>
+        )}
+        {badge && (
+          <span
+            className={`absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold shadow ${badge.cls}`}
+          >
+            {badge.label}
           </span>
         )}
       </div>
