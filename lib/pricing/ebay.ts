@@ -55,6 +55,41 @@ async function getToken(scope: string): Promise<string | null> {
   }
 }
 
+// One-off image lookup for an existing eBay listing URL. Used by the backfill
+// route to populate `imageUrl` on Comp rows that were created before the
+// image-saving code shipped. Returns null if the URL doesn't look like an
+// eBay item URL, the token can't be fetched, or eBay doesn't return an image.
+export async function fetchEbayItemImage(itemUrl: string): Promise<string | null> {
+  const match = itemUrl.match(/\/itm\/(?:[^/]+\/)?(\d{10,15})/);
+  if (!match) return null;
+  const legacyId = match[1];
+  const token = await getToken(BASE_SCOPE);
+  if (!token) return null;
+
+  try {
+    const res = await fetch(
+      `https://api.ebay.com/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+        },
+      }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      image?: { imageUrl?: string };
+      thumbnailImages?: Array<{ imageUrl?: string }>;
+    };
+    return (
+      data.image?.imageUrl ?? data.thumbnailImages?.[0]?.imageUrl ?? null
+    );
+  } catch (err) {
+    console.error("eBay item lookup error:", err);
+    return null;
+  }
+}
+
 export async function searchEbay(query: string, limit = 20): Promise<RawComp[]> {
   const token = await getToken(BASE_SCOPE);
   if (!token || !query.trim()) return [];

@@ -50,8 +50,8 @@ export default async function HomePage() {
             Snap it. Price it. Profit.
           </h1>
           <p className="mt-2 text-muted">
-            Photograph any object and instantly see what it resells for across eBay, Etsy,
-            Mercari, Facebook Marketplace, Swappa and more — then know if it&apos;s a deal.
+            Photograph any object, pull live eBay comps plus broader market research,
+            and instantly see what it resells for — and whether it&apos;s a deal worth buying.
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <Link
