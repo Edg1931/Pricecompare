@@ -87,7 +87,7 @@ export default async function ItemPage({
   const qrDataUrl = await QRCode.toDataURL(`${origin}/item/${item.id}`, {
     margin: 1,
     width: 240,
-  });
+  }).catch(() => "");
   const market = marketplaceLinks(item.searchQuery ?? item.name);
   const crossListings = buildCrossListings({
     name: item.name,
