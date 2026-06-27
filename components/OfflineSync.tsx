@@ -12,9 +12,9 @@ import {
 import { sendJson } from "@/lib/utils";
 
 /**
- * Mounted once in the root layout. Registers the service worker, and drains the
- * offline scan queue (snap-now, analyze-later) whenever the app is open and
- * online — on load, when connectivity returns, and when a new scan is queued.
+ * Mounted once in the root layout. Drains the offline scan queue
+ * (snap-now, analyze-later) whenever the app is open and online —
+ * on load, when connectivity returns, and when a new scan is queued.
  */
 export function OfflineSync() {
   const router = useRouter();
@@ -22,11 +22,6 @@ export function OfflineSync() {
   const [syncing, setSyncing] = useState(false);
   const runningRef = useRef(false);
 
-  useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
-  }, []);
 
   const flush = useCallback(async () => {
     if (runningRef.current) return;
