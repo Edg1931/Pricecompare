@@ -157,18 +157,31 @@ CRITICAL accuracy rules for comps:
 - For "sold" comps: only include a "url" if that exact sold price is actually viewable at that URL. eBay/marketplace sold items are often relisted at different prices, so if the link would show a different (active) price, set "url" to null.
 - Prefer fewer, verifiable comps over many uncertain ones.`;
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 3000,
-    tools: [
+  // Hard cap at 45 s so the Vercel function always has time for the Prisma
+  // writes that follow. AbortSignal.timeout is Node 17+ / all Vercel runtimes.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("research timeout")), 45_000);
+
+  let response;
+  try {
+    response = await anthropic.messages.create(
       {
-        type: "web_search_20250305",
-        name: "web_search",
-        max_uses: 3,
-      } as never,
-    ],
-    messages: [{ role: "user", content: prompt }],
-  });
+        model: MODEL,
+        max_tokens: 3000,
+        tools: [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: 3,
+          } as never,
+        ],
+        messages: [{ role: "user", content: prompt }],
+      },
+      { signal: controller.signal }
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 
   const text = response.content
     .filter((c) => c.type === "text")

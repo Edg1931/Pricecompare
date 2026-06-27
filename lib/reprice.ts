@@ -40,50 +40,59 @@ export async function repriceItem(id: string): Promise<{ median: number | null }
     if (hit) alertUpdate = { alertTriggeredAt: new Date() };
   }
 
-  await prisma.comp.deleteMany({ where: { itemId: id } });
-  await prisma.item.update({
-    where: { id },
-    data: {
-      recommendedLow: result.aggregate.low,
-      recommendedMedian: median,
-      recommendedHigh: result.aggregate.high,
-      priceConfidence: result.aggregate.confidence,
-      sampleSize: result.aggregate.sampleSize,
-      marketContext: result.marketContext,
-      priceTrend: result.trend ? JSON.stringify(result.trend) : item.priceTrend,
-      demand: result.demand ? JSON.stringify(result.demand) : item.demand,
-      dealScore: result.deal.dealScore,
-      verdict: result.deal.verdict,
-      bestPlatform: result.deal.bestPlatform,
-      netProceeds: JSON.stringify(result.deal.netProceeds),
-      analysisSummary: result.deal.summary,
-      listingTitle: result.listing?.title ?? item.listingTitle,
-      listingDescription: result.listing?.description ?? item.listingDescription,
-      ...alertUpdate,
-      comps: {
-        create: result.comps.map((c) => ({
-          source: c.source,
-          title: c.title,
-          price: c.price,
-          currency: c.currency ?? "USD",
-          url: c.url ?? null,
-          imageUrl: c.imageUrl ?? null,
-          condition: c.condition ?? null,
-          listingType: c.listingType ?? "active",
-        })),
+  try {
+    await prisma.comp.deleteMany({ where: { itemId: id } });
+  } catch (err) {
+    throw new Error(`DB error deleting old comps: ${err instanceof Error ? err.message : err}`);
+  }
+
+  try {
+    await prisma.item.update({
+      where: { id },
+      data: {
+        recommendedLow: result.aggregate.low,
+        recommendedMedian: median,
+        recommendedHigh: result.aggregate.high,
+        priceConfidence: result.aggregate.confidence,
+        sampleSize: result.aggregate.sampleSize,
+        marketContext: result.marketContext,
+        priceTrend: result.trend ? JSON.stringify(result.trend) : item.priceTrend,
+        demand: result.demand ? JSON.stringify(result.demand) : item.demand,
+        dealScore: result.deal.dealScore,
+        verdict: result.deal.verdict,
+        bestPlatform: result.deal.bestPlatform,
+        netProceeds: JSON.stringify(result.deal.netProceeds),
+        analysisSummary: result.deal.summary,
+        listingTitle: result.listing?.title ?? item.listingTitle,
+        listingDescription: result.listing?.description ?? item.listingDescription,
+        ...alertUpdate,
+        comps: {
+          create: result.comps.map((c) => ({
+            source: c.source,
+            title: c.title,
+            price: c.price,
+            currency: c.currency ?? "USD",
+            url: c.url ?? null,
+            imageUrl: c.imageUrl ?? null,
+            condition: c.condition ?? null,
+            listingType: c.listingType ?? "active",
+          })),
+        },
+        snapshots: {
+          create: [
+            {
+              low: result.aggregate.low,
+              median,
+              high: result.aggregate.high,
+              sampleSize: result.aggregate.sampleSize,
+            },
+          ],
+        },
       },
-      snapshots: {
-        create: [
-          {
-            low: result.aggregate.low,
-            median,
-            high: result.aggregate.high,
-            sampleSize: result.aggregate.sampleSize,
-          },
-        ],
-      },
-    },
-  });
+    });
+  } catch (err) {
+    throw new Error(`DB error saving repriced item: ${err instanceof Error ? err.message : err}`);
+  }
 
   return { median };
 }
