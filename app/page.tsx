@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ScanLine, Sparkles, Images, Layers } from "lucide-react";
+import { ScanLine, Sparkles, Images, Layers, Zap } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { parseNetProceeds } from "@/lib/item";
@@ -76,6 +76,12 @@ export default async function HomePage() {
               className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-3 font-medium transition hover:border-brand"
             >
               <Layers className="h-5 w-5" /> Lot / pile
+            </Link>
+            <Link
+              href="/quickscan"
+              className="inline-flex items-center gap-2 rounded-xl border border-brand/40 bg-brand/5 px-5 py-3 font-medium text-brand transition hover:bg-brand/10"
+            >
+              <Zap className="h-5 w-5" /> Quick scan
             </Link>
           </div>
         </div>
