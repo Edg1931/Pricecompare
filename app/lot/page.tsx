@@ -37,6 +37,7 @@ export default function LotPage() {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<LotItem[]>([]);
   const [pricing, setPricing] = useState(false);
+  const [lotCost, setLotCost] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const nextId = useRef(0);
 
@@ -103,6 +104,14 @@ export default function LotPage() {
         // detail fetch is best-effort
       }
       update(it.id, { status: "done", itemId: data.id as string, verdict, median });
+      if (lotCost && parseFloat(lotCost) > 0 && data.id) {
+        const perItem = parseFloat(lotCost) / Math.max(1, items.filter((i) => i.include).length);
+        fetch(`/api/items/${data.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ purchasePrice: Math.round(perItem * 100) / 100 }),
+        }).catch(() => null);
+      }
     } catch (err) {
       update(it.id, {
         status: "error",
@@ -191,6 +200,22 @@ export default function LotPage() {
               placeholder="e.g. mostly vintage electronics and tools"
               className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-3 outline-none placeholder:text-muted"
             />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">Total lot cost (optional)</span>
+            <div className="relative mt-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={lotCost}
+                onChange={(e) => setLotCost(e.target.value)}
+                placeholder="0.00"
+                className="w-full rounded-xl border border-border bg-surface py-3 pl-7 pr-3 outline-none placeholder:text-muted"
+              />
+            </div>
+            <p className="mt-1 text-xs text-muted">Split evenly across all priced items as their purchase price.</p>
           </label>
           {error && (
             <p className="rounded-xl border border-over/40 bg-over/10 px-4 py-3 text-sm text-over">
