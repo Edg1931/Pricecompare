@@ -32,6 +32,7 @@ export async function GET(req: Request) {
 
   const start = Date.now();
   let checked = 0;
+  let errors = 0;
   const CONCURRENCY = 3;
 
   for (let i = 0; i < items.length; i += CONCURRENCY) {
@@ -43,10 +44,14 @@ export async function GET(req: Request) {
         checked += 1;
       } else {
         console.error("Re-check failed:", r.reason);
+        errors += 1;
       }
     }
   }
 
+  const durationMs = Date.now() - start;
+  await prisma.cronLog.create({ data: { checked, queued: Math.max(0, items.length - checked), errors, durationMs } }).catch((err) => console.error("CronLog write failed:", err));
+
   const queued = Math.max(0, items.length - checked);
-  return NextResponse.json({ checked, queued });
+  return NextResponse.json({ checked, queued, durationMs });
 }

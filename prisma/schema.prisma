@@ -141,3 +141,12 @@ model Comp {
 
   @@index([itemId])
 }
+
+model CronLog {
+  id         String   @id @default(cuid())
+  runAt      DateTime @default(now())
+  checked    Int
+  queued     Int
+  errors     Int      @default(0)
+  durationMs Int      @default(0)
+}
