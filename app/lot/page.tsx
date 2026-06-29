@@ -80,39 +80,45 @@ export default function LotPage() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   }
 
+  async function priceOne(it: LotItem) {
+    update(it.id, { status: "running", error: undefined });
+    try {
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images, identification: it.ident }),
+      });
+      const data = await readJson(res);
+
+      let verdict: string | null = null;
+      let median: number | null = null;
+      try {
+        const r2 = await fetch(`/api/items/${data.id}`);
+        if (r2.ok) {
+          const d2 = await r2.json();
+          verdict = d2.item?.verdict ?? null;
+          median = d2.item?.recommendedMedian ?? null;
+        }
+      } catch {
+        // detail fetch is best-effort
+      }
+      update(it.id, { status: "done", itemId: data.id as string, verdict, median });
+    } catch (err) {
+      update(it.id, {
+        status: "error",
+        error: err instanceof Error ? err.message : "Failed",
+      });
+    }
+  }
+
   async function priceAll() {
     if (pricing) return;
     setPricing(true);
     const todo = items.filter((it) => it.include && it.status !== "done");
-    for (const it of todo) {
-      update(it.id, { status: "running", error: undefined });
-      try {
-        const res = await fetch("/api/items", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ images, identification: it.ident }),
-        });
-        const data = await readJson(res);
-
-        let verdict: string | null = null;
-        let median: number | null = null;
-        try {
-          const r2 = await fetch(`/api/items/${data.id}`);
-          if (r2.ok) {
-            const d2 = await r2.json();
-            verdict = d2.item?.verdict ?? null;
-            median = d2.item?.recommendedMedian ?? null;
-          }
-        } catch {
-          // detail fetch is best-effort
-        }
-        update(it.id, { status: "done", itemId: data.id as string, verdict, median });
-      } catch (err) {
-        update(it.id, {
-          status: "error",
-          error: err instanceof Error ? err.message : "Failed",
-        });
-      }
+    // Run up to 3 items in parallel so a lot of 9 finishes in ~3× less time.
+    const CONCURRENCY = 3;
+    for (let i = 0; i < todo.length; i += CONCURRENCY) {
+      await Promise.allSettled(todo.slice(i, i + CONCURRENCY).map(priceOne));
     }
     setPricing(false);
   }

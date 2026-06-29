@@ -29,6 +29,40 @@ function supabase(): SupabaseClient {
 }
 
 /**
+ * Delete photos for an item from Supabase Storage (or local uploads).
+ * Called before the Prisma Item row is deleted to avoid orphaned files.
+ * Errors are swallowed — a storage cleanup failure should never block a delete.
+ */
+export async function deletePhotos(photoUrls: string[]): Promise<void> {
+  if (photoUrls.length === 0) return;
+  if (supabaseConfigured()) {
+    const client = supabase();
+    const paths = photoUrls
+      .map((url) => {
+        // Extract the path after the bucket name, e.g. "item-photos/abc/0.jpg" → "abc/0.jpg"
+        const marker = `/${BUCKET}/`;
+        const idx = url.indexOf(marker);
+        return idx !== -1 ? url.slice(idx + marker.length) : null;
+      })
+      .filter((p): p is string => p !== null);
+    if (paths.length > 0) {
+      await client.storage.from(BUCKET).remove(paths).catch((err) => {
+        console.error("Supabase storage cleanup failed:", err);
+      });
+    }
+  } else {
+    // Local mode: delete from /public/uploads/<itemId>/
+    const { unlink } = await import("fs/promises");
+    await Promise.allSettled(
+      photoUrls.map((url) => {
+        const localPath = url.startsWith("/") ? url.slice(1) : url;
+        return unlink(path.join(process.cwd(), "public", localPath)).catch(() => null);
+      })
+    );
+  }
+}
+
+/**
  * Persist base64 data-URL images and return public URLs.
  * Uses Supabase Storage in production; falls back to the local /public/uploads
  * folder for offline local development when Supabase isn't configured.

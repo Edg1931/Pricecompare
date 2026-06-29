@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { priceAndAnalyze } from "@/lib/analysis/pipeline";
 import { parseAttributes } from "@/lib/item";
+import { sendAlertEmail } from "@/lib/notifications";
 import type { ItemIdentification } from "@/lib/types";
 
 /**
@@ -37,7 +38,18 @@ export async function repriceItem(id: string): Promise<{ median: number | null }
       item.alertDirection === "above"
         ? median >= item.alertTarget
         : median <= item.alertTarget;
-    if (hit) alertUpdate = { alertTriggeredAt: new Date() };
+    if (hit) {
+      alertUpdate = { alertTriggeredAt: new Date() };
+      // Fire-and-forget — email failure must not abort the reprice.
+      sendAlertEmail({
+        userId: item.userId,
+        itemName: item.name,
+        itemId: item.id,
+        median: median!,
+        target: item.alertTarget!,
+        direction: item.alertDirection ?? "below",
+      }).catch(() => null);
+    }
   }
 
   try {

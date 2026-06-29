@@ -64,6 +64,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // In open (unauthenticated) mode, limit how many items can be created per
+  // hour globally to prevent runaway API costs from automated abuse.
+  if (!userId) {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentCount = await prisma.item.count({
+      where: { userId: null, createdAt: { gte: oneHourAgo } },
+    });
+    if (recentCount >= 20) {
+      return NextResponse.json(
+        { error: "Too many scans in the last hour. Please try again later." },
+        { status: 429 }
+      );
+    }
+  }
+
   try {
     const result = identification
       ? await priceAndAnalyze(
