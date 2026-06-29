@@ -32,6 +32,8 @@ export interface LibItem {
   profit: number | null;
   createdAt: string;
   photoUrl: string | null;
+  boughtAt: string | null;
+  compCount: number;
 }
 
 function downloadCsv(items: LibItem[]) {
@@ -82,6 +84,7 @@ type VerdictFilter = (typeof VERDICT_FILTERS)[number];
 
 const SORTS = {
   newest: "Newest",
+  oldest: "Oldest in stock",
   value: "Highest value",
   deal: "Best deal",
   profit: "Most profit",
@@ -173,6 +176,11 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
           return (b.dealScore ?? -1) - (a.dealScore ?? -1);
         case "profit":
           return (b.profit ?? -Infinity) - (a.profit ?? -Infinity);
+        case "oldest":
+          if (a.boughtAt && b.boughtAt) return a.boughtAt.localeCompare(b.boughtAt);
+          if (a.boughtAt) return -1;
+          if (b.boughtAt) return 1;
+          return a.createdAt.localeCompare(b.createdAt);
         case "newest":
         default:
           return b.createdAt.localeCompare(a.createdAt);
@@ -341,10 +349,20 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <VerdictBadge verdict={item.verdict as Verdict | null} />
                     <StatusBadge status={item.status} />
+                    {(() => {
+                      const daysInStock = item.boughtAt ? Math.floor((Date.now() - new Date(item.boughtAt).getTime()) / 86400000) : null;
+                      if (daysInStock !== null && daysInStock >= 60) {
+                        return <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-over/15 text-over">60+ days</span>;
+                      }
+                      if (daysInStock !== null && daysInStock >= 30) {
+                        return <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-yellow-500/15 text-yellow-600 dark:text-yellow-400">30+ days</span>;
+                      }
+                      return null;
+                    })()}
                   </div>
                   <p className="line-clamp-1 text-sm font-medium">{item.name}</p>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted">{timeAgo(new Date(item.createdAt))}</span>
+                    <span className="text-muted">{timeAgo(new Date(item.createdAt))}{item.compCount > 0 ? ` · ${item.compCount} comp${item.compCount === 1 ? '' : 's'}` : ''}</span>
                     <span className="font-semibold tabular-nums">
                       {item.recommendedMedian !== null
                         ? formatCurrency(item.recommendedMedian)

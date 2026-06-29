@@ -15,7 +15,10 @@ export default async function HomePage() {
   const items = await prisma.item.findMany({
     where: ownerWhere(user?.id ?? null),
     orderBy: { createdAt: "desc" },
-    include: { photos: { orderBy: { order: "asc" }, take: 1 } },
+    include: {
+      photos: { orderBy: { order: "asc" }, take: 1 },
+      _count: { select: { comps: true } },
+    },
   });
 
   const libItems: LibItem[] = items.map((it) => {
@@ -36,6 +39,8 @@ export default async function HomePage() {
       profit,
       createdAt: it.createdAt.toISOString(),
       photoUrl: it.photos[0]?.url ?? null,
+      boughtAt: it.boughtAt?.toISOString() ?? null,
+      compCount: it._count.comps,
     };
   });
   const potentialProfit = libItems.reduce((sum, it) => sum + (it.profit ?? 0), 0);
