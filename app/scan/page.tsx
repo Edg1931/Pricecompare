@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Camera, ImagePlus, X, Sparkles, Loader2, ScanBarcode } from "lucide-react";
 import { fileToDataUrl } from "@/lib/image";
 import { readJson } from "@/lib/utils";
@@ -27,6 +28,7 @@ export default function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [queued, setQueued] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export default function ScanPage() {
     setImages((prev) => [...prev, ...urls].slice(0, 8));
   }
 
-  async function analyze() {
+  async function analyze(opts?: { force?: boolean; hintOverride?: string }) {
     if (images.length === 0) return;
     // Measure the actual upload payload (the base64 data URLs as sent), not the
     // decoded image size, so we stay under Vercel's ~4.5 MB request-body limit.
@@ -52,11 +54,12 @@ export default function ScanPage() {
       return;
     }
     const askingPrice = asking.trim() ? Number(asking) : null;
+    const effectiveHint = opts?.hintOverride ?? hint;
 
     // Offline: save the scan locally and let OfflineSync upload it on reconnect.
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       try {
-        await enqueueScan({ images, askingPrice, hint: hint.trim() || undefined });
+        await enqueueScan({ images, askingPrice, hint: effectiveHint.trim() || undefined });
         notifyQueueChanged();
         setImages([]);
         setAsking("");
@@ -72,6 +75,7 @@ export default function ScanPage() {
     setLoading(true);
     setStage(0);
     setError(null);
+    setDuplicate(null);
     try {
       const res = await fetch("/api/items", {
         method: "POST",
@@ -79,9 +83,16 @@ export default function ScanPage() {
         body: JSON.stringify({
           images,
           askingPrice,
-          hint: hint.trim() || undefined,
+          hint: effectiveHint.trim() || undefined,
+          force: opts?.force,
         }),
       });
+      if (res.status === 409) {
+        const d = await res.json() as { existingId?: string; existingName?: string };
+        setDuplicate({ id: d.existingId ?? "", name: d.existingName ?? "this item" });
+        setLoading(false);
+        return;
+      }
       const data = await readJson(res);
       if (typeof data.id !== "string") {
         throw new Error("The server didn't return a saved item. Please try again.");
@@ -227,10 +238,33 @@ export default function ScanPage() {
         <BarcodeScanner
           onClose={() => setScanning(false)}
           onDetected={(code) => {
-            setHint((prev) => (prev.trim() ? `${prev} UPC ${code}` : `UPC ${code}`));
+            setHint(code);
             setScanning(false);
+            // Auto-analyze immediately if photos are already loaded
+            if (images.length > 0) analyze({ hintOverride: code });
           }}
         />
+      )}
+
+      {duplicate && (
+        <div className="rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm">
+          <p className="font-medium">You may already have this in your library.</p>
+          <p className="mt-0.5 text-muted">&ldquo;{duplicate.name}&rdquo;</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={`/item/${duplicate.id}`}
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-3 py-1.5 font-medium transition hover:border-brand hover:text-brand"
+            >
+              View existing →
+            </Link>
+            <button
+              onClick={() => analyze({ force: true })}
+              className="rounded-lg border border-border bg-surface px-3 py-1.5 font-medium transition hover:border-brand hover:text-brand"
+            >
+              Add anyway
+            </button>
+          </div>
+        </div>
       )}
 
       {error && (
@@ -246,7 +280,7 @@ export default function ScanPage() {
       )}
 
       <button
-        onClick={analyze}
+        onClick={() => analyze()}
         disabled={images.length === 0}
         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-brand to-brand-2 py-4 text-lg font-semibold text-white shadow-xl shadow-brand/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
       >

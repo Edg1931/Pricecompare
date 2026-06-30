@@ -81,9 +81,16 @@ export default async function DashboardPage() {
     (i) => (i.status === "bought" || i.status === "listed") && i.soldPrice == null
   );
   const capital = holding.reduce((s, i) => s + (i.purchasePrice ?? i.askingPrice ?? 0), 0);
-  const aging = holding.filter(
-    (i) => (now.getTime() - (i.boughtAt ?? i.createdAt).getTime()) / 86400000 >= 60
-  ).length;
+
+  const holdingWithAge = holding.map((i) => ({
+    ...i,
+    daysHeld: Math.floor((now.getTime() - (i.boughtAt ?? i.createdAt).getTime()) / 86400000),
+  }));
+  const aging = holdingWithAge.filter((i) => i.daysHeld >= 60).length;
+  const stale = holdingWithAge
+    .filter((i) => i.daysHeld >= 45)
+    .sort((a, b) => b.daysHeld - a.daysHeld)
+    .slice(0, 5);
 
   return (
     <div className="space-y-7">
@@ -181,6 +188,28 @@ export default async function DashboardPage() {
             value={<span className={aging > 0 ? "text-over" : ""}>{aging}</span>}
           />
         </div>
+
+        {stale.length > 0 && (
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+              Sitting longest — consider relisting or discounting
+            </p>
+            <div className="space-y-1.5">
+              {stale.map((i) => (
+                <Link
+                  key={i.id}
+                  href={`/item/${i.id}`}
+                  className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm transition hover:bg-surface-2"
+                >
+                  <span className="truncate">{i.name}</span>
+                  <span className={`ml-3 shrink-0 tabular-nums ${i.daysHeld >= 60 ? "text-over" : "text-amber-500"}`}>
+                    {i.daysHeld}d
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Tax export — Schedule C reconciliation CSV */}

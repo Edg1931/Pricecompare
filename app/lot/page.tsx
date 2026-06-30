@@ -28,6 +28,7 @@ interface LotItem {
   verdict?: string | null;
   median?: number | null;
   error?: string;
+  duplicateOf?: string;
 }
 
 export default function LotPage() {
@@ -81,14 +82,19 @@ export default function LotPage() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   }
 
-  async function priceOne(it: LotItem) {
-    update(it.id, { status: "running", error: undefined });
+  async function priceOne(it: LotItem, force?: boolean) {
+    update(it.id, { status: "running", error: undefined, duplicateOf: undefined });
     try {
       const res = await fetch("/api/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images, identification: it.ident }),
+        body: JSON.stringify({ images, identification: it.ident, force }),
       });
+      if (res.status === 409) {
+        const d = await res.json() as { existingId?: string };
+        update(it.id, { status: "done", duplicateOf: d.existingId ?? "" });
+        return;
+      }
       const data = await readJson(res);
 
       let verdict: string | null = null;
@@ -127,7 +133,7 @@ export default function LotPage() {
     // Run up to 3 items in parallel so a lot of 9 finishes in ~3× less time.
     const CONCURRENCY = 3;
     for (let i = 0; i < todo.length; i += CONCURRENCY) {
-      await Promise.allSettled(todo.slice(i, i + CONCURRENCY).map(priceOne));
+      await Promise.allSettled(todo.slice(i, i + CONCURRENCY).map((it) => priceOne(it)));
     }
     setPricing(false);
   }
@@ -263,8 +269,13 @@ export default function LotPage() {
                   {started ? (
                     <>
                       <div className="flex items-center gap-2">
-                        {it.status === "done" && (
+                        {it.status === "done" && !it.duplicateOf && (
                           <VerdictBadge verdict={it.verdict as Verdict | null} />
+                        )}
+                        {it.duplicateOf && (
+                          <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-medium text-amber-600">
+                            Already in library
+                          </span>
                         )}
                         {it.median != null && (
                           <span className="text-sm font-semibold tabular-nums">
@@ -273,6 +284,14 @@ export default function LotPage() {
                         )}
                       </div>
                       <p className="line-clamp-1 text-sm text-muted">{it.ident.name}</p>
+                      {it.duplicateOf && (
+                        <button
+                          onClick={() => priceOne(it, true)}
+                          className="text-xs text-muted underline underline-offset-2 transition hover:text-brand"
+                        >
+                          Add anyway
+                        </button>
+                      )}
                       {it.status === "error" && (
                         <p className="text-xs text-over">{it.error}</p>
                       )}
@@ -292,7 +311,7 @@ export default function LotPage() {
                   <Loader2 className="h-5 w-5 shrink-0 animate-spin text-brand" />
                 ) : it.status === "done" ? (
                   <Link
-                    href={`/item/${it.itemId}`}
+                    href={`/item/${it.duplicateOf ?? it.itemId}`}
                     className="shrink-0 rounded-lg border border-border bg-surface-2 p-2 text-muted transition hover:text-brand"
                   >
                     <ArrowRight className="h-4 w-4" />
@@ -309,7 +328,7 @@ export default function LotPage() {
                     </button>
                   )
                 )}
-                {it.status === "done" && <Check className="h-5 w-5 shrink-0 text-steal" />}
+                {it.status === "done" && !it.duplicateOf && <Check className="h-5 w-5 shrink-0 text-steal" />}
               </div>
             ))}
           </div>
