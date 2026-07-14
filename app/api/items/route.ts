@@ -65,14 +65,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // In open (unauthenticated) mode, limit how many items can be created per
-  // hour globally to prevent runaway API costs from automated abuse.
-  if (!userId) {
+  // Rate-limit item creation to bound AI spend: 20/hour globally in open
+  // (unauthenticated) mode, 60/hour per signed-in user (a throwaway account
+  // must not be able to drain the Anthropic budget).
+  {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const limit = userId ? 60 : 20;
     const recentCount = await prisma.item.count({
-      where: { userId: null, createdAt: { gte: oneHourAgo } },
+      where: { userId: userId ?? null, createdAt: { gte: oneHourAgo } },
     });
-    if (recentCount >= 20) {
+    if (recentCount >= limit) {
       return NextResponse.json(
         { error: "Too many scans in the last hour. Please try again later." },
         { status: 429 }

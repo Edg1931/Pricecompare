@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Camera, Zap, Loader2, RotateCcw } from "lucide-react";
+import { Camera, Zap, RotateCcw } from "lucide-react";
 import { fileToDataUrl } from "@/lib/image";
 import { readJson, formatCurrency } from "@/lib/utils";
 import type { Verdict } from "@/lib/types";
@@ -45,12 +45,14 @@ export default function QuickScanPage() {
       if (typeof data.id !== "string") {
         throw new Error("The server didn't return a saved item. Please try again.");
       }
-      // Fetch full item data to get verdict + recommendedMedian
+      // Fetch full item data to get verdict + recommendedMedian.
+      // The API wraps the payload as { item: {...} }.
       const itemRes = await fetch(`/api/items/${data.id}`);
-      const item = await readJson(itemRes);
+      const detail = await readJson(itemRes);
+      const item = (detail.item ?? {}) as { verdict?: Verdict | null; recommendedMedian?: number | null };
       setResult({
         id: data.id,
-        verdict: (item.verdict as Verdict) ?? null,
+        verdict: item.verdict ?? null,
         recommendedMedian: typeof item.recommendedMedian === "number" ? item.recommendedMedian : null,
       });
       setStage("result");
@@ -182,6 +184,7 @@ export default function QuickScanPage() {
         ref={fileRef}
         type="file"
         accept="image/*"
+        capture="environment"
         hidden
         onChange={(e) => handleFile(e.target.files)}
       />
@@ -214,7 +217,7 @@ export default function QuickScanPage() {
         disabled={!image}
         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-brand to-brand-2 py-4 text-lg font-semibold text-white shadow-xl shadow-brand/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        <Loader2 className="h-5 w-5" />
+        <Zap className="h-5 w-5" />
         Analyze
       </button>
     </div>

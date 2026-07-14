@@ -32,18 +32,22 @@ export async function generateListing(
     const priceLine = recommendedMedian
       ? `Suggested price: ${formatCurrency(recommendedMedian)}.`
       : "";
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 700,
-      tools: [LISTING_TOOL],
-      tool_choice: { type: "tool", name: "write_listing" },
-      messages: [
-        {
-          role: "user",
-          content: `Write a resale listing for this item.\n\nName: ${ident.name}\nBrand: ${ident.brand ?? "—"}\nModel: ${ident.model ?? "—"}\nCondition: ${ident.condition ?? "—"}${ident.conditionNotes ? ` (${ident.conditionNotes})` : ""}\nAttributes: ${ident.attributes.map((a) => `${a.label}: ${a.value}`).join(", ") || "—"}\n${priceLine}\n\nThen call write_listing.`,
-        },
-      ],
-    });
+    const response = await anthropic.messages.create(
+      {
+        model: MODEL,
+        max_tokens: 700,
+        tools: [LISTING_TOOL],
+        tool_choice: { type: "tool", name: "write_listing" },
+        messages: [
+          {
+            role: "user",
+            content: `Write a resale listing for this item.\n\nName: ${ident.name}\nBrand: ${ident.brand ?? "—"}\nModel: ${ident.model ?? "—"}\nCondition: ${ident.condition ?? "—"}${ident.conditionNotes ? ` (${ident.conditionNotes})` : ""}\nAttributes: ${ident.attributes.map((a) => `${a.label}: ${a.value}`).join(", ") || "—"}\n${priceLine}\n\nThen call write_listing.`,
+          },
+        ],
+      },
+      // Runs concurrently with research; cap it so it can't outlast the budget.
+      { timeout: 25_000, maxRetries: 1 }
+    );
     const toolUse = response.content.find((c) => c.type === "tool_use");
     if (!toolUse || toolUse.type !== "tool_use") return null;
     const input = toolUse.input as Record<string, unknown>;

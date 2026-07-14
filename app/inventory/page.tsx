@@ -13,12 +13,14 @@ export const dynamic = "force-dynamic";
 
 export default async function InventoryPage() {
   const userId = await currentUserId();
-  const settings = await getSettings(userId);
-  const items = await prisma.item.findMany({
-    where: ownerWhere(userId),
-    orderBy: { createdAt: "desc" },
-    include: { photos: { orderBy: { order: "asc" }, take: 1 } },
-  });
+  const [settings, items] = await Promise.all([
+    getSettings(userId),
+    prisma.item.findMany({
+      where: ownerWhere(userId),
+      orderBy: { createdAt: "desc" },
+      include: { photos: { orderBy: { order: "asc" }, take: 1 } },
+    }),
+  ]);
 
   const holding = items.filter(
     (i) => (i.status === "bought" || i.status === "listed") && i.soldPrice == null

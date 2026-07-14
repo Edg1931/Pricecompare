@@ -92,6 +92,7 @@ export function BarcodeScanner({
             <ScanBarcode className="h-5 w-5 text-brand" /> Scan barcode
           </h3>
           <button
+            aria-label="Close"
             onClick={onClose}
             className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:text-fg"
           >

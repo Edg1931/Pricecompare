@@ -61,9 +61,8 @@ export default async function ItemPage({
 }) {
   const { id } = await params;
   const userId = await currentUserId();
-  const item = await getItem(id, userId);
+  const [item, settings] = await Promise.all([getItem(id, userId), getSettings(userId)]);
   if (!item) notFound();
-  const settings = await getSettings(userId);
 
   const attributes = parseAttributes(item.attributes);
   const netProceeds = parseNetProceeds(item.netProceeds);

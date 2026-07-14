@@ -28,40 +28,48 @@ export async function repriceItem(id: string): Promise<{ median: number | null }
     reasoning: item.identNotes,
   };
 
-  const result = await priceAndAnalyze(ident, item.askingPrice);
+  const result = await priceAndAnalyze(ident, item.askingPrice, { skipListing: true });
   const median = result.aggregate.median;
+
+  // If every pricing source failed (AI outage, no credits, network), refuse to
+  // overwrite: proceeding would delete all existing comps and null out the
+  // item's prices. Keeping the previous state is strictly better.
+  if (median == null && result.comps.length === 0) {
+    throw new Error(
+      "No pricing data returned (all sources failed or empty) — keeping previous prices and comps."
+    );
+  }
 
   // Trip the alert if the fresh median crosses the target.
   let alertUpdate = {};
-  if (item.alertTarget != null && median != null && !item.alertTriggeredAt) {
-    const hit =
-      item.alertDirection === "above"
-        ? median >= item.alertTarget
-        : median <= item.alertTarget;
-    if (hit) {
-      alertUpdate = { alertTriggeredAt: new Date() };
-      // Fire-and-forget — email failure must not abort the reprice.
-      sendAlertEmail({
-        userId: item.userId,
-        itemName: item.name,
-        itemId: item.id,
-        median: median!,
-        target: item.alertTarget!,
-        direction: item.alertDirection ?? "below",
-      }).catch(() => null);
-    }
+  const alertHit =
+    item.alertTarget != null &&
+    median != null &&
+    !item.alertTriggeredAt &&
+    (item.alertDirection === "above" ? median >= item.alertTarget : median <= item.alertTarget);
+  if (alertHit) {
+    alertUpdate = { alertTriggeredAt: new Date() };
   }
 
   try {
-    await prisma.comp.deleteMany({ where: { itemId: id } });
-  } catch (err) {
-    throw new Error(`DB error deleting old comps: ${err instanceof Error ? err.message : err}`);
-  }
-
-  try {
+    // deleteMany + create inside one nested update runs as a single implicit
+    // transaction — a failure can't leave the item stripped of comps.
     await prisma.item.update({
       where: { id },
       data: {
+        comps: {
+          deleteMany: {},
+          create: result.comps.map((c) => ({
+            source: c.source,
+            title: c.title,
+            price: c.price,
+            currency: c.currency ?? "USD",
+            url: c.url ?? null,
+            imageUrl: c.imageUrl ?? null,
+            condition: c.condition ?? null,
+            listingType: c.listingType ?? "active",
+          })),
+        },
         recommendedLow: result.aggregate.low,
         recommendedMedian: median,
         recommendedHigh: result.aggregate.high,
@@ -78,18 +86,6 @@ export async function repriceItem(id: string): Promise<{ median: number | null }
         listingTitle: result.listing?.title ?? item.listingTitle,
         listingDescription: result.listing?.description ?? item.listingDescription,
         ...alertUpdate,
-        comps: {
-          create: result.comps.map((c) => ({
-            source: c.source,
-            title: c.title,
-            price: c.price,
-            currency: c.currency ?? "USD",
-            url: c.url ?? null,
-            imageUrl: c.imageUrl ?? null,
-            condition: c.condition ?? null,
-            listingType: c.listingType ?? "active",
-          })),
-        },
         snapshots: {
           create: [
             {
@@ -104,6 +100,20 @@ export async function repriceItem(id: string): Promise<{ median: number | null }
     });
   } catch (err) {
     throw new Error(`DB error saving repriced item: ${err instanceof Error ? err.message : err}`);
+  }
+
+  // Send the alert email only after the alertTriggeredAt write committed —
+  // otherwise a failed update after a sent email double-notifies on the next
+  // cron, and a sent-but-uncommitted alert is re-processed anyway.
+  if (alertHit) {
+    sendAlertEmail({
+      userId: item.userId,
+      itemName: item.name,
+      itemId: item.id,
+      median: median!,
+      target: item.alertTarget!,
+      direction: item.alertDirection ?? "below",
+    }).catch((err) => console.error("Alert email failed:", err));
   }
 
   return { median };

@@ -327,6 +327,7 @@ function Modal({
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-semibold">{title}</h3>
           <button
+            aria-label="Close"
             onClick={onClose}
             className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:text-fg"
           >
@@ -596,6 +597,7 @@ export function EditDetailsButton({ item }: { item: EditableItem }) {
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-semibold">Edit item details</h3>
               <button
+                aria-label="Close"
                 onClick={() => setOpen(false)}
                 className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:text-fg"
               >

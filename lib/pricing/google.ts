@@ -55,6 +55,7 @@ export async function searchGoogleShopping(
   try {
     const res = await fetch(url.toString(), {
       headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       console.error("Google CSE failed:", res.status, await res.text());

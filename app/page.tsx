@@ -12,11 +12,28 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const user = await getUser();
   if (user) await claimOrphansIfOwner(user);
+  // Select only the fields the library card needs — the full row carries
+  // multi-KB text columns (listing, market context, trend JSON) that would
+  // otherwise be fetched and serialized for every item on every visit.
   const items = await prisma.item.findMany({
     where: ownerWhere(user?.id ?? null),
     orderBy: { createdAt: "desc" },
-    include: {
-      photos: { orderBy: { order: "asc" }, take: 1 },
+    take: 500,
+    select: {
+      id: true,
+      name: true,
+      brand: true,
+      model: true,
+      category: true,
+      verdict: true,
+      status: true,
+      recommendedMedian: true,
+      dealScore: true,
+      askingPrice: true,
+      netProceeds: true,
+      createdAt: true,
+      boughtAt: true,
+      photos: { orderBy: { order: "asc" }, take: 1, select: { url: true } },
       _count: { select: { comps: true } },
     },
   });

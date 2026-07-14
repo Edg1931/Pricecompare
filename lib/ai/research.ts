@@ -85,8 +85,10 @@ function extractJsonBlock(text: string): unknown | null {
     const parsed = tryParse(candidate.trim());
     if (parsed) return parsed;
   }
-  // Fall back to the last {...} object in the text.
-  const start = text.lastIndexOf("{");
+  // Fall back to the outermost {...} span in the text. (lastIndexOf("{")
+  // would grab the innermost trailing object — e.g. the final comp — which
+  // parses fine but has no `comps` key, silently discarding all results.)
+  const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start !== -1 && end > start) {
     return tryParse(text.slice(start, end + 1));

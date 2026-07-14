@@ -48,47 +48,53 @@ export default function BatchPage() {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
   }
 
+  async function runOne(job: Job) {
+    update(job.id, { status: "running", error: undefined });
+    try {
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: [job.src], askingPrice: null }),
+      });
+      const data = await readJson(res);
+
+      let name: string | undefined;
+      let verdict: string | null = null;
+      let median: number | null = null;
+      try {
+        const r2 = await fetch(`/api/items/${data.id}`);
+        if (r2.ok) {
+          const d2 = await r2.json();
+          name = d2.item?.name;
+          verdict = d2.item?.verdict ?? null;
+          median = d2.item?.recommendedMedian ?? null;
+        }
+      } catch {
+        // detail fetch is best-effort; the item was still created
+      }
+      update(job.id, {
+        status: "done",
+        itemId: data.id as string,
+        name,
+        verdict,
+        median,
+      });
+    } catch (err) {
+      update(job.id, {
+        status: "error",
+        error: err instanceof Error ? err.message : "Failed",
+      });
+    }
+  }
+
   async function start() {
     if (running) return;
     setRunning(true);
     const todo = jobs.filter((j) => j.status !== "done");
-    for (const job of todo) {
-      update(job.id, { status: "running", error: undefined });
-      try {
-        const res = await fetch("/api/items", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ images: [job.src], askingPrice: null }),
-        });
-        const data = await readJson(res);
-
-        let name: string | undefined;
-        let verdict: string | null = null;
-        let median: number | null = null;
-        try {
-          const r2 = await fetch(`/api/items/${data.id}`);
-          if (r2.ok) {
-            const d2 = await r2.json();
-            name = d2.item?.name;
-            verdict = d2.item?.verdict ?? null;
-            median = d2.item?.recommendedMedian ?? null;
-          }
-        } catch {
-          // detail fetch is best-effort; the item was still created
-        }
-        update(job.id, {
-          status: "done",
-          itemId: data.id as string,
-          name,
-          verdict,
-          median,
-        });
-      } catch (err) {
-        update(job.id, {
-          status: "error",
-          error: err instanceof Error ? err.message : "Failed",
-        });
-      }
+    // 3 concurrent, same as lot mode — a 20-photo batch finishes ~3× sooner.
+    const CONCURRENCY = 3;
+    for (let i = 0; i < todo.length; i += CONCURRENCY) {
+      await Promise.allSettled(todo.slice(i, i + CONCURRENCY).map((j) => runOne(j)));
     }
     setRunning(false);
   }
@@ -259,7 +265,7 @@ export default function BatchPage() {
           </div>
           {running && (
             <p className="text-center text-xs text-muted">
-              Keep this page open — items are priced one at a time (~20–60s each).
+              Keep this page open — items are priced 3 at a time (~20–60s each).
             </p>
           )}
         </>

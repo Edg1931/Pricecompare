@@ -154,9 +154,10 @@ export default function ScanPage() {
             />
             <button
               onClick={() => setImages((p) => p.filter((_, idx) => idx !== i))}
-              className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-over text-white shadow-lg"
+              aria-label="Remove photo"
+              className="absolute -right-2 -top-2 grid h-8 w-8 place-items-center rounded-full bg-over text-white shadow-lg"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         ))}

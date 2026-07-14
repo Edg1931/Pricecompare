@@ -12,11 +12,41 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const userId = await currentUserId();
-  const settings = await getSettings(userId);
-  const items = await prisma.item.findMany({ where: ownerWhere(userId) });
+  // Two narrow queries instead of one full-table read: sold items (for P&L)
+  // and current holdings (for the inventory snapshot). Run alongside settings.
+  const [settings, sold, holding] = await Promise.all([
+    getSettings(userId),
+    prisma.item.findMany({
+      where: { ...ownerWhere(userId), soldPrice: { not: null } },
+      select: {
+        purchasePrice: true,
+        askingPrice: true,
+        soldPrice: true,
+        soldMarketplace: true,
+        shippingCost: true,
+        soldFees: true,
+        soldAt: true,
+        boughtAt: true,
+        category: true,
+      },
+    }),
+    prisma.item.findMany({
+      where: {
+        ...ownerWhere(userId),
+        status: { in: ["bought", "listed"] },
+        soldPrice: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        purchasePrice: true,
+        askingPrice: true,
+        boughtAt: true,
+        createdAt: true,
+      },
+    }),
+  ]);
   const now = new Date();
-
-  const sold = items.filter((i) => i.soldPrice != null);
   const rows = sold.map((i) => ({
     i,
     pnl: realizedPnL({
@@ -77,9 +107,6 @@ export default async function DashboardPage() {
   const maxCat = Math.max(1, ...catRows.map(([, v]) => Math.abs(v.net)));
 
   // Inventory snapshot
-  const holding = items.filter(
-    (i) => (i.status === "bought" || i.status === "listed") && i.soldPrice == null
-  );
   const capital = holding.reduce((s, i) => s + (i.purchasePrice ?? i.askingPrice ?? 0), 0);
 
   const holdingWithAge = holding.map((i) => ({

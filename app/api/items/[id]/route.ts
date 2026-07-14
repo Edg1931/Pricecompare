@@ -78,7 +78,7 @@ export async function PATCH(
   // If the asking price changed, recompute the deal locally (no new AI calls).
   let dealUpdate = {};
   if ("askingPrice" in data) {
-    const deal = analyzeDeal(existing.recommendedMedian, data.askingPrice ?? null);
+    const deal = analyzeDeal(existing.recommendedMedian, data.askingPrice ?? null, existing.sampleSize);
     dealUpdate = {
       dealScore: deal.dealScore,
       verdict: deal.verdict,
