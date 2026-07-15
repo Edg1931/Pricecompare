@@ -28,6 +28,7 @@ interface LotItem {
   verdict?: string | null;
   median?: number | null;
   error?: string;
+  duplicateOf?: string;
 }
 
 export default function LotPage() {
@@ -37,6 +38,7 @@ export default function LotPage() {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<LotItem[]>([]);
   const [pricing, setPricing] = useState(false);
+  const [lotCost, setLotCost] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const nextId = useRef(0);
 
@@ -80,39 +82,58 @@ export default function LotPage() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   }
 
+  async function priceOne(it: LotItem, force?: boolean) {
+    update(it.id, { status: "running", error: undefined, duplicateOf: undefined });
+    try {
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images, identification: it.ident, force }),
+      });
+      if (res.status === 409) {
+        const d = await res.json() as { existingId?: string };
+        update(it.id, { status: "done", duplicateOf: d.existingId ?? "" });
+        return;
+      }
+      const data = await readJson(res);
+
+      let verdict: string | null = null;
+      let median: number | null = null;
+      try {
+        const r2 = await fetch(`/api/items/${data.id}`);
+        if (r2.ok) {
+          const d2 = await r2.json();
+          verdict = d2.item?.verdict ?? null;
+          median = d2.item?.recommendedMedian ?? null;
+        }
+      } catch {
+        // detail fetch is best-effort
+      }
+      update(it.id, { status: "done", itemId: data.id as string, verdict, median });
+      if (lotCost && parseFloat(lotCost) > 0 && data.id) {
+        const perItem = parseFloat(lotCost) / Math.max(1, items.filter((i) => i.include).length);
+        fetch(`/api/items/${data.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ purchasePrice: Math.round(perItem * 100) / 100 }),
+        }).catch(() => null);
+      }
+    } catch (err) {
+      update(it.id, {
+        status: "error",
+        error: err instanceof Error ? err.message : "Failed",
+      });
+    }
+  }
+
   async function priceAll() {
     if (pricing) return;
     setPricing(true);
     const todo = items.filter((it) => it.include && it.status !== "done");
-    for (const it of todo) {
-      update(it.id, { status: "running", error: undefined });
-      try {
-        const res = await fetch("/api/items", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ images, identification: it.ident }),
-        });
-        const data = await readJson(res);
-
-        let verdict: string | null = null;
-        let median: number | null = null;
-        try {
-          const r2 = await fetch(`/api/items/${data.id}`);
-          if (r2.ok) {
-            const d2 = await r2.json();
-            verdict = d2.item?.verdict ?? null;
-            median = d2.item?.recommendedMedian ?? null;
-          }
-        } catch {
-          // detail fetch is best-effort
-        }
-        update(it.id, { status: "done", itemId: data.id as string, verdict, median });
-      } catch (err) {
-        update(it.id, {
-          status: "error",
-          error: err instanceof Error ? err.message : "Failed",
-        });
-      }
+    // Run up to 3 items in parallel so a lot of 9 finishes in ~3× less time.
+    const CONCURRENCY = 3;
+    for (let i = 0; i < todo.length; i += CONCURRENCY) {
+      await Promise.allSettled(todo.slice(i, i + CONCURRENCY).map((it) => priceOne(it)));
     }
     setPricing(false);
   }
@@ -143,9 +164,10 @@ export default function LotPage() {
             {items.length === 0 && (
               <button
                 onClick={() => setImages((p) => p.filter((_, idx) => idx !== i))}
-                className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-over text-white shadow-lg"
+                aria-label="Remove photo"
+                className="absolute -right-2 -top-2 grid h-8 w-8 place-items-center rounded-full bg-over text-white shadow-lg"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
@@ -185,6 +207,22 @@ export default function LotPage() {
               placeholder="e.g. mostly vintage electronics and tools"
               className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-3 outline-none placeholder:text-muted"
             />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">Total lot cost (optional)</span>
+            <div className="relative mt-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={lotCost}
+                onChange={(e) => setLotCost(e.target.value)}
+                placeholder="0.00"
+                className="w-full rounded-xl border border-border bg-surface py-3 pl-7 pr-3 outline-none placeholder:text-muted"
+              />
+            </div>
+            <p className="mt-1 text-xs text-muted">Split evenly across all priced items as their purchase price.</p>
           </label>
           {error && (
             <p className="rounded-xl border border-over/40 bg-over/10 px-4 py-3 text-sm text-over">
@@ -232,8 +270,13 @@ export default function LotPage() {
                   {started ? (
                     <>
                       <div className="flex items-center gap-2">
-                        {it.status === "done" && (
+                        {it.status === "done" && !it.duplicateOf && (
                           <VerdictBadge verdict={it.verdict as Verdict | null} />
+                        )}
+                        {it.duplicateOf && (
+                          <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-medium text-amber-600">
+                            Already in library
+                          </span>
                         )}
                         {it.median != null && (
                           <span className="text-sm font-semibold tabular-nums">
@@ -242,6 +285,14 @@ export default function LotPage() {
                         )}
                       </div>
                       <p className="line-clamp-1 text-sm text-muted">{it.ident.name}</p>
+                      {it.duplicateOf && (
+                        <button
+                          onClick={() => priceOne(it, true)}
+                          className="text-xs text-muted underline underline-offset-2 transition hover:text-brand"
+                        >
+                          Add anyway
+                        </button>
+                      )}
                       {it.status === "error" && (
                         <p className="text-xs text-over">{it.error}</p>
                       )}
@@ -261,7 +312,7 @@ export default function LotPage() {
                   <Loader2 className="h-5 w-5 shrink-0 animate-spin text-brand" />
                 ) : it.status === "done" ? (
                   <Link
-                    href={`/item/${it.itemId}`}
+                    href={`/item/${it.duplicateOf ?? it.itemId}`}
                     className="shrink-0 rounded-lg border border-border bg-surface-2 p-2 text-muted transition hover:text-brand"
                   >
                     <ArrowRight className="h-4 w-4" />
@@ -278,7 +329,7 @@ export default function LotPage() {
                     </button>
                   )
                 )}
-                {it.status === "done" && <Check className="h-5 w-5 shrink-0 text-steal" />}
+                {it.status === "done" && !it.duplicateOf && <Check className="h-5 w-5 shrink-0 text-steal" />}
               </div>
             ))}
           </div>
@@ -302,7 +353,7 @@ export default function LotPage() {
           )}
           {pricing && (
             <p className="text-center text-xs text-muted">
-              Keep this page open — items are priced one at a time (~20–60s each).
+              Keep this page open — items are priced 3 at a time (~20–60s each).
             </p>
           )}
         </>

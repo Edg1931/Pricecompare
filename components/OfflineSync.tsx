@@ -9,7 +9,6 @@ import {
   countQueuedScans,
   onQueueChanged,
 } from "@/lib/offline";
-import { sendJson } from "@/lib/utils";
 
 /**
  * Mounted once in the root layout. Drains the offline scan queue
@@ -39,17 +38,27 @@ export function OfflineSync() {
       let uploaded = 0;
       for (const scan of queue) {
         try {
-          await sendJson("/api/items", "POST", {
-            images: scan.images,
-            askingPrice: scan.askingPrice,
-            hint: scan.hint || undefined,
+          const res = await fetch("/api/items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              images: scan.images,
+              askingPrice: scan.askingPrice,
+              hint: scan.hint || undefined,
+            }),
           });
-          await removeQueuedScan(scan.id);
-          uploaded += 1;
-          setPending((n) => Math.max(0, n - 1));
+          if (res.ok || res.status === 409) {
+            // 409 = duplicate already in library — remove from queue so it
+            // doesn't block the rest of the queue on every sync attempt.
+            await removeQueuedScan(scan.id);
+            if (res.ok) uploaded += 1;
+            setPending((n) => Math.max(0, n - 1));
+          } else {
+            // Transient server error — keep queued and retry later.
+            break;
+          }
         } catch {
-          // Likely offline again or a transient server error — keep the rest
-          // queued and try again on the next online/queue event.
+          // Likely offline again — keep the rest queued.
           break;
         }
       }

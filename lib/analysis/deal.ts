@@ -144,7 +144,8 @@ function verdictFor(ratio: number): Verdict {
 
 export function analyzeDeal(
   median: number | null,
-  askingPrice: number | null
+  askingPrice: number | null,
+  sampleSize?: number | null
 ): DealAnalysis {
   const netProceeds = median ? computeNetProceeds(median) : [];
   const bestPlatform = netProceeds[0]?.platform ?? null;
@@ -157,6 +158,19 @@ export function analyzeDeal(
       bestPlatform,
       estimatedProfit: null,
       summary: "Not enough market data to estimate a resale price.",
+    };
+  }
+
+  // A median from 1-2 comps is a guess, not a market price. Refuse to issue
+  // a confident verdict/score on it.
+  if (sampleSize != null && sampleSize < 3) {
+    return {
+      dealScore: null,
+      verdict: null,
+      netProceeds,
+      bestPlatform,
+      estimatedProfit: null,
+      summary: `Only ${sampleSize} comparable listing${sampleSize === 1 ? "" : "s"} found — too few for a confident verdict. Rough value estimate: ${formatCurrency(median)}. Try re-analyzing with a more specific hint.`,
     };
   }
 

@@ -44,6 +44,16 @@ export async function ownerScope(): Promise<
 > {
   const userId = await currentUserId();
   if (authEnabled() && !userId) return { ok: false };
+  // Fail closed: if the Supabase env vars go missing in production (env
+  // drift, renamed var), open mode would silently expose every user's data
+  // as one shared public library. Require an explicit opt-in to run open.
+  if (
+    !authEnabled() &&
+    process.env.NODE_ENV === "production" &&
+    process.env.ALLOW_OPEN_MODE !== "true"
+  ) {
+    return { ok: false };
+  }
   return { ok: true, userId };
 }
 

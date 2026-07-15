@@ -26,3 +26,12 @@ jobs:
       - run: npm run typecheck
 
       - run: npm run lint
+
+      - run: npm test
+
+      # Catch build breakage before it reaches Vercel. Skips migrate deploy
+      # (no DB in CI) — plain `next build` after generate.
+      - run: npx next build
+        env:
+          DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+          DIRECT_URL: "postgresql://ci:ci@localhost:5432/ci"

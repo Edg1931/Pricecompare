@@ -69,11 +69,17 @@ export async function persistAnalysis(
     },
   });
 
-  // Save photos using the item id, then attach.
-  const urls = await savePhotos(item.id, opts.imageDataUrls);
-  await prisma.photo.createMany({
-    data: urls.map((url, order) => ({ itemId: item.id, url, order })),
-  });
+  // Save photos using the item id, then attach. If photo storage fails, keep
+  // the item anyway: the analysis (the expensive part) succeeded, and failing
+  // the request here would make the user retry and double-spend on AI.
+  try {
+    const urls = await savePhotos(item.id, opts.imageDataUrls);
+    await prisma.photo.createMany({
+      data: urls.map((url, order) => ({ itemId: item.id, url, order })),
+    });
+  } catch (err) {
+    console.error(`Photo save failed for item ${item.id} (analysis kept):`, err);
+  }
 
   return item.id;
 }
@@ -83,14 +89,18 @@ export type ItemWithRelations = NonNullable<
 >;
 
 export async function getItem(id: string, userId: string | null = null) {
-  return prisma.item.findFirst({
+  const item = await prisma.item.findFirst({
     where: { id, ...(userId ? { userId } : {}) },
     include: {
       photos: { orderBy: { order: "asc" } },
       comps: { orderBy: { price: "asc" } },
-      snapshots: { orderBy: { createdAt: "asc" } },
+      // Watched items gain snapshots on every cron reprice — cap the load and
+      // keep the most recent ones (reversed back to ascending for the chart).
+      snapshots: { orderBy: { createdAt: "desc" }, take: 120 },
     },
   });
+  item?.snapshots.reverse();
+  return item;
 }
 
 export function parseAttributes(json: string | null): { label: string; value: string }[] {

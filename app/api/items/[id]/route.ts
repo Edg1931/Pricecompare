@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { analyzeDeal } from "@/lib/analysis/deal";
 import { ownerScope, ownerWhere } from "@/lib/auth";
+import { deletePhotos } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -77,7 +78,7 @@ export async function PATCH(
   // If the asking price changed, recompute the deal locally (no new AI calls).
   let dealUpdate = {};
   if ("askingPrice" in data) {
-    const deal = analyzeDeal(existing.recommendedMedian, data.askingPrice ?? null);
+    const deal = analyzeDeal(existing.recommendedMedian, data.askingPrice ?? null, existing.sampleSize);
     dealUpdate = {
       dealScore: deal.dealScore,
       verdict: deal.verdict,
@@ -125,6 +126,16 @@ export async function DELETE(
   const { id } = await params;
   const scope = await ownerScope();
   if (!scope.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Fetch photo URLs before deleting so we can clean up Supabase storage.
+  const item = await prisma.item.findFirst({
+    where: { id, ...ownerWhere(scope.userId) },
+    select: { photos: { select: { url: true } } },
+  });
+  if (item) {
+    await deletePhotos(item.photos.map((p) => p.url));
+  }
+
   await prisma.item.deleteMany({ where: { id, ...ownerWhere(scope.userId) } }).catch(() => null);
   return NextResponse.json({ ok: true });
 }

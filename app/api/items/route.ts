@@ -32,6 +32,7 @@ const createSchema = z.object({
   notes: z.string().max(2000).optional(),
   hint: z.string().max(500).optional(),
   identification: identificationSchema.optional(),
+  force: z.boolean().optional(),
 });
 
 export async function POST(req: Request) {
@@ -57,26 +58,103 @@ export async function POST(req: Request) {
     );
   }
 
-  const { images, askingPrice, notes, hint, identification } = parsed.data;
+  const { images, askingPrice, notes, hint, identification, force } = parsed.data;
 
   const userId = await currentUserId();
   if (authEnabled() && !userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Rate-limit item creation to bound AI spend: 20/hour globally in open
+  // (unauthenticated) mode, 60/hour per signed-in user (a throwaway account
+  // must not be able to drain the Anthropic budget).
+  {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const limit = userId ? 60 : 20;
+    const recentCount = await prisma.item.count({
+      where: { userId: userId ?? null, createdAt: { gte: oneHourAgo } },
+    });
+    if (recentCount >= limit) {
+      return NextResponse.json(
+        { error: "Too many scans in the last hour. Please try again later." },
+        { status: 429 }
+      );
+    }
+  }
+
+  // UPC barcode fast-path: if hint is a pure numeric string 8-14 chars long
+  // and no identification was provided, try to look up the product via UPC API
+  // before running Claude vision.
+  let barcodeIdent: ItemIdentification | undefined;
+  if (!identification) {
+    const upcHint = hint?.trim();
+    if (upcHint && /^\d{8,14}$/.test(upcHint)) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        const upcRes = await fetch(
+          `https://api.upcitemdb.com/prod/trial/lookup?upc=${upcHint}`,
+          { signal: controller.signal }
+        ).finally(() => clearTimeout(timeout));
+        if (upcRes.ok) {
+          const upcData = await upcRes.json() as { items?: { title?: string; brand?: string; category?: string; description?: string }[] };
+          const item0 = upcData.items?.[0];
+          if (item0?.title) {
+            barcodeIdent = {
+              name: item0.title,
+              brand: item0.brand ?? null,
+              model: null,
+              category: item0.category ?? null,
+              condition: "Used",
+              conditionNotes: null,
+              attributes: [],
+              searchQuery: [item0.brand, item0.title].filter(Boolean).join(" "),
+              confidence: 0.85,
+              reasoning: `Identified via UPC ${upcHint}`,
+            };
+          }
+        }
+      } catch {
+        // silently fall through to Claude vision
+      }
+    }
+  }
+
+  // Duplicate detection: if we have an identification (passed in or from barcode)
+  // and a userId, check for potential duplicates before proceeding.
+  const activeIdent = identification ?? barcodeIdent;
+  if (activeIdent && userId) {
+    const firstWord = activeIdent.name.trim().split(/\s+/)[0];
+    const existingItem = await prisma.item.findFirst({
+      where: {
+        ...ownerWhere(userId),
+        name: { contains: firstWord, mode: "insensitive" },
+        soldPrice: null,
+      },
+      select: { id: true, name: true },
+    });
+    if (existingItem && !force) {
+      return NextResponse.json(
+        { duplicate: true, existingId: existingItem.id, existingName: existingItem.name },
+        { status: 409 }
+      );
+    }
+  }
+
+
   try {
-    const result = identification
+    const result = activeIdent
       ? await priceAndAnalyze(
           {
-            ...identification,
-            brand: identification.brand ?? null,
-            model: identification.model ?? null,
-            category: identification.category ?? null,
-            condition: identification.condition ?? null,
-            conditionNotes: identification.conditionNotes ?? null,
-            attributes: identification.attributes ?? [],
-            confidence: identification.confidence ?? 0.6,
-            reasoning: identification.reasoning ?? null,
+            ...activeIdent,
+            brand: activeIdent.brand ?? null,
+            model: activeIdent.model ?? null,
+            category: activeIdent.category ?? null,
+            condition: activeIdent.condition ?? null,
+            conditionNotes: activeIdent.conditionNotes ?? null,
+            attributes: activeIdent.attributes ?? [],
+            confidence: activeIdent.confidence ?? 0.6,
+            reasoning: activeIdent.reasoning ?? null,
           } satisfies ItemIdentification,
           askingPrice ?? null
         )

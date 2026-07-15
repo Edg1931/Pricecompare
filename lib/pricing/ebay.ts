@@ -38,6 +38,7 @@ async function getToken(scope: string): Promise<string | null> {
         Authorization: `Basic ${basic}`,
       },
       body: new URLSearchParams({ grant_type: "client_credentials", scope }),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       console.error("eBay OAuth failed:", res.status, await res.text());
@@ -74,6 +75,7 @@ export async function fetchEbayItemImage(itemUrl: string): Promise<string | null
           Authorization: `Bearer ${token}`,
           "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
         },
+        signal: AbortSignal.timeout(10_000),
       }
     );
     if (!res.ok) return null;
@@ -106,6 +108,7 @@ export async function searchEbay(query: string, limit = 20): Promise<RawComp[]> 
         "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       console.error("eBay Browse failed:", res.status, await res.text());
@@ -170,6 +173,7 @@ export async function searchEbaySold(query: string, limit = 20): Promise<RawComp
         "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       // 401/403 means the app isn't authorized for Insights — disable it.

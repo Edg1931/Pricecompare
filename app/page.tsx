@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ScanLine, Sparkles, Images, Layers } from "lucide-react";
+import { ScanLine, Sparkles, Images, Layers, Zap } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { parseNetProceeds } from "@/lib/item";
@@ -12,10 +12,30 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const user = await getUser();
   if (user) await claimOrphansIfOwner(user);
+  // Select only the fields the library card needs — the full row carries
+  // multi-KB text columns (listing, market context, trend JSON) that would
+  // otherwise be fetched and serialized for every item on every visit.
   const items = await prisma.item.findMany({
     where: ownerWhere(user?.id ?? null),
     orderBy: { createdAt: "desc" },
-    include: { photos: { orderBy: { order: "asc" }, take: 1 } },
+    take: 500,
+    select: {
+      id: true,
+      name: true,
+      brand: true,
+      model: true,
+      category: true,
+      verdict: true,
+      status: true,
+      recommendedMedian: true,
+      dealScore: true,
+      askingPrice: true,
+      netProceeds: true,
+      createdAt: true,
+      boughtAt: true,
+      photos: { orderBy: { order: "asc" }, take: 1, select: { url: true } },
+      _count: { select: { comps: true } },
+    },
   });
 
   const libItems: LibItem[] = items.map((it) => {
@@ -36,6 +56,8 @@ export default async function HomePage() {
       profit,
       createdAt: it.createdAt.toISOString(),
       photoUrl: it.photos[0]?.url ?? null,
+      boughtAt: it.boughtAt?.toISOString() ?? null,
+      compCount: it._count.comps,
     };
   });
   const potentialProfit = libItems.reduce((sum, it) => sum + (it.profit ?? 0), 0);
@@ -71,6 +93,12 @@ export default async function HomePage() {
               className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-3 font-medium transition hover:border-brand"
             >
               <Layers className="h-5 w-5" /> Lot / pile
+            </Link>
+            <Link
+              href="/quickscan"
+              className="inline-flex items-center gap-2 rounded-xl border border-brand/40 bg-brand/5 px-5 py-3 font-medium text-brand transition hover:bg-brand/10"
+            >
+              <Zap className="h-5 w-5" /> Quick scan
             </Link>
           </div>
         </div>

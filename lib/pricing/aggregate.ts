@@ -29,13 +29,24 @@ export function aggregatePrices(comps: RawComp[]): PriceAggregate {
   const used = valid.filter((c) => inRange(c.price));
   const usedComps = used.length > 0 ? used : valid;
 
-  // Sold comps are the truest signal of resale value, so weight them more
-  // heavily when computing the price range.
-  const SOLD_WEIGHT = 2;
+  // Sold comps are the truest signal of resale value. Active listings are
+  // asking prices (items sell below ask or not at all), and Google Shopping
+  // comps are frequently NEW retail prices — both overstate realized resale
+  // value, so they get a haircut when computing the estimate. The extra 2×
+  // weight for sold comps only applies to eBay API results; "sold" claims
+  // from web research are the least-verified source and stay at 1×.
+  const ACTIVE_HAIRCUT = 0.85;
+  const RETAIL_HAIRCUT = 0.8;
+  const adjusted = (c: RawComp) =>
+    c.listingType === "sold"
+      ? c.price
+      : c.source === "google"
+        ? c.price * RETAIL_HAIRCUT
+        : c.price * ACTIVE_HAIRCUT;
   const weighted: number[] = [];
   for (const c of usedComps) {
-    const w = c.listingType === "sold" ? SOLD_WEIGHT : 1;
-    for (let i = 0; i < w; i++) weighted.push(c.price);
+    const w = c.listingType === "sold" && c.source === "ebay" ? 2 : 1;
+    for (let i = 0; i < w; i++) weighted.push(adjusted(c));
   }
   weighted.sort((a, b) => a - b);
 

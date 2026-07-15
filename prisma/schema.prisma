@@ -74,7 +74,8 @@ model Item {
   comps             Comp[]
   snapshots         PriceSnapshot[]
 
-  @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, soldAt])
 }
 
 // Per-user preferences for the money math (defaults applied when absent).
@@ -97,7 +98,7 @@ model Expense {
   miles       Float?
   createdAt   DateTime @default(now())
 
-  @@index([userId])
+  @@index([userId, date])
 }
 
 // A point-in-time record of the estimated resale price, captured on each
@@ -122,6 +123,8 @@ model Photo {
   url       String
   order     Int      @default(0)
   createdAt DateTime @default(now())
+
+  @@index([itemId])
 }
 
 model Comp {
@@ -140,4 +143,13 @@ model Comp {
   capturedAt  DateTime @default(now())
 
   @@index([itemId])
+}
+
+model CronLog {
+  id         String   @id @default(cuid())
+  runAt      DateTime @default(now())
+  checked    Int
+  queued     Int
+  errors     Int      @default(0)
+  durationMs Int      @default(0)
 }

@@ -118,15 +118,21 @@ export async function identifyLot(
     userHint ? `\n\nThe user added this hint: "${userHint}"` : ""
   }\n\nThen call the report_items tool.`;
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 2048,
-    tools: [LOT_TOOL],
-    tool_choice: { type: "tool", name: "report_items" },
-    messages: [
-      { role: "user", content: [...imageBlocks, { type: "text", text: promptText }] },
-    ],
-  });
+  const response = await anthropic.messages.create(
+    {
+      model: MODEL,
+      // A pile can hold ~20 items; 2048 tokens risks truncating the tool JSON
+      // mid-array, which fails the whole lot.
+      max_tokens: 4000,
+      tools: [LOT_TOOL],
+      tool_choice: { type: "tool", name: "report_items" },
+      messages: [
+        { role: "user", content: [...imageBlocks, { type: "text", text: promptText }] },
+      ],
+    },
+    // Without a cap the SDK default (10 min) far exceeds the serverless budget.
+    { timeout: 40_000, maxRetries: 1 }
+  );
 
   const toolUse = response.content.find((c) => c.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") {
@@ -177,18 +183,22 @@ export async function identifyItem(
     userHint ? `\n\nThe user added this hint: "${userHint}"` : ""
   }\n\nBe specific — include brand, model, and distinguishing attributes when you can see them. If uncertain, give your best guess and lower the confidence. Then call the report_item tool.`;
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 1024,
-    tools: [IDENT_TOOL],
-    tool_choice: { type: "tool", name: "report_item" },
-    messages: [
-      {
-        role: "user",
-        content: [...imageBlocks, { type: "text", text: promptText }],
-      },
-    ],
-  });
+  const response = await anthropic.messages.create(
+    {
+      model: MODEL,
+      max_tokens: 1024,
+      tools: [IDENT_TOOL],
+      tool_choice: { type: "tool", name: "report_item" },
+      messages: [
+        {
+          role: "user",
+          content: [...imageBlocks, { type: "text", text: promptText }],
+        },
+      ],
+    },
+    // Without a cap the SDK default (10 min) far exceeds the serverless budget.
+    { timeout: 30_000, maxRetries: 1 }
+  );
 
   const toolUse = response.content.find((c) => c.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") {

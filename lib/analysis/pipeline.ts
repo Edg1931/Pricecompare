@@ -24,7 +24,8 @@ export interface AnalysisResult {
  */
 export async function priceAndAnalyze(
   identification: ItemIdentification,
-  askingPrice: number | null
+  askingPrice: number | null,
+  opts?: { skipListing?: boolean }
 ): Promise<AnalysisResult> {
   // Run pricing research and listing generation concurrently so the listing
   // doesn't add to the critical path (it would otherwise push us past
@@ -37,7 +38,9 @@ export async function priceAndAnalyze(
     hasEbay() ? searchEbaySold(identification.searchQuery) : Promise.resolve([]),
     searchGoogleShopping(identification.searchQuery, 10),
     researchPrices(identification),
-    generateListing(identification, null),
+    // Reprices skip listing generation: it costs a full Sonnet call and would
+    // overwrite any edits the user made to the generated listing.
+    opts?.skipListing ? Promise.resolve(null) : generateListing(identification, null),
   ]);
   const [ebayActiveR, ebaySoldR, googleCompsR, researchR, listingR] = settled;
   const ebayActive  = ebayActiveR.status  === "fulfilled" ? ebayActiveR.value  : [];
@@ -52,7 +55,7 @@ export async function priceAndAnalyze(
 
   const comps = [...ebaySold, ...ebayActive, ...googleComps, ...research.comps];
   const aggregate = aggregatePrices(comps);
-  const deal = analyzeDeal(aggregate.median, askingPrice);
+  const deal = analyzeDeal(aggregate.median, askingPrice, aggregate.sampleSize);
 
   return {
     identification,

@@ -61,9 +61,8 @@ export default async function ItemPage({
 }) {
   const { id } = await params;
   const userId = await currentUserId();
-  const item = await getItem(id, userId);
+  const [item, settings] = await Promise.all([getItem(id, userId), getSettings(userId)]);
   if (!item) notFound();
-  const settings = await getSettings(userId);
 
   const attributes = parseAttributes(item.attributes);
   const netProceeds = parseNetProceeds(item.netProceeds);
@@ -77,6 +76,29 @@ export default async function ItemPage({
     .filter(Boolean)
     .join("\n\n");
   const priceTrend = parsePriceTrend(item.priceTrend);
+
+  function projectPrice(
+    trend: NonNullable<ReturnType<typeof parsePriceTrend>>
+  ): { projected: number; direction: "rising" | "falling" | "stable" } | null {
+    const points = [trend.y1, trend.m6, trend.m3, trend.current].filter(
+      (v): v is number => v != null && v > 0
+    );
+    if (points.length < 2) return null;
+    const first = points[0];
+    const last = points[points.length - 1];
+    const slope = (last - first) / (points.length - 1);
+    const projected = last + slope;
+    const direction =
+      projected > last * 1.03
+        ? "rising"
+        : projected < last * 0.97
+        ? "falling"
+        : "stable";
+    return { projected: Math.max(1, projected), direction };
+  }
+
+  const trendProjection = priceTrend ? projectPrice(priceTrend) : null;
+
   const snapshots = item.snapshots.map((s) => ({
     median: s.median,
     createdAt: s.createdAt.toISOString(),
@@ -87,7 +109,7 @@ export default async function ItemPage({
   const qrDataUrl = await QRCode.toDataURL(`${origin}/item/${item.id}`, {
     margin: 1,
     width: 240,
-  });
+  }).catch(() => "");
   const market = marketplaceLinks(item.searchQuery ?? item.name);
   const crossListings = buildCrossListings({
     name: item.name,
@@ -131,6 +153,7 @@ export default async function ItemPage({
     item.searchQuery || item.name
   );
   const soldCompCount = item.comps.filter((c) => c.listingType === "sold").length;
+  const hasSoldComps = soldCompCount > 0;
   const activeCompCount = item.comps.length - soldCompCount;
   const compSources = [...new Set(item.comps.map((c) => sourceMeta(c.source).label))];
 
@@ -347,11 +370,18 @@ export default async function ItemPage({
             current prices, or re-analyze.
           </p>
         ) : (
-          <CompsViewer
-          comps={realComps}
-          itemCondition={item.condition}
-          itemId={item.id}
-        />
+          <>
+            {!hasSoldComps && item.sampleSize != null && item.sampleSize > 0 && (
+              <div className="mb-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-2.5 text-sm text-yellow-700 dark:text-yellow-400">
+                Pricing based on active listings only — no sold comps found. Results may be less accurate. Approve eBay Marketplace Insights API access or reanalyze for sold data.
+              </div>
+            )}
+            <CompsViewer
+            comps={realComps}
+            itemCondition={item.condition}
+            itemId={item.id}
+          />
+          </>
         )}
       </Card>
 
@@ -403,6 +433,28 @@ export default async function ItemPage({
 
           {/* Price history & trend */}
           <PriceHistoryCard trend={priceTrend} snapshots={snapshots} />
+
+          {/* 60-day price projection */}
+          {trendProjection && (
+            <div className="rounded-xl border border-border bg-surface/70 px-4 py-3 text-sm flex items-center justify-between gap-3">
+              <span className="text-muted">60-day outlook</span>
+              <span
+                className={
+                  trendProjection.direction === "rising"
+                    ? "text-steal"
+                    : trendProjection.direction === "falling"
+                    ? "text-over"
+                    : "text-muted"
+                }
+              >
+                {trendProjection.direction === "rising"
+                  ? `↑ ~${formatCurrency(trendProjection.projected)}`
+                  : trendProjection.direction === "falling"
+                  ? `↓ ~${formatCurrency(trendProjection.projected)}`
+                  : `→ ~${formatCurrency(trendProjection.projected)}`}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">

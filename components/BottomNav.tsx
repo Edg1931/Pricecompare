@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, BarChart3, ScanLine, Wallet, Bell } from "lucide-react";
+import { LayoutGrid, BarChart3, ScanLine, Wallet, Bell, Zap } from "lucide-react";
 
 export function BottomNav({ alertCount }: { alertCount: number }) {
   const path = usePathname();
@@ -40,6 +40,7 @@ export function BottomNav({ alertCount }: { alertCount: number }) {
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/90 backdrop-blur-xl sm:hidden">
       <div className="mx-auto flex max-w-md items-end justify-around px-2 pb-[env(safe-area-inset-bottom)]">
         {tab("/", "Library", LayoutGrid)}
+        {tab("/quickscan", "Quick", Zap)}
         {tab("/dashboard", "Stats", BarChart3)}
         <Link
           href="/scan"
