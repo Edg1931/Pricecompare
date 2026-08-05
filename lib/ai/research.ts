@@ -174,7 +174,7 @@ CRITICAL accuracy rules for comps:
           {
             type: "web_search_20250305",
             name: "web_search",
-            max_uses: 3,
+            max_uses: 5,
           } as never,
         ],
         messages: [{ role: "user", content: prompt }],

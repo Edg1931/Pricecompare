@@ -4,6 +4,7 @@ import { researchPrices } from "@/lib/ai/research";
 import { generateListing } from "@/lib/ai/listing";
 import { searchEbay, searchEbaySold, hasEbay } from "@/lib/pricing/ebay";
 import { searchGoogleShopping } from "@/lib/pricing/google";
+import { verifyCompLinks } from "@/lib/pricing/verify";
 import { aggregatePrices } from "@/lib/pricing/aggregate";
 import { analyzeDeal } from "@/lib/analysis/deal";
 
@@ -53,7 +54,17 @@ export async function priceAndAnalyze(
   if (researchR.status === "rejected")  console.error("Research failed:",  researchR.reason);
   if (listingR.status  === "rejected")  console.error("Listing gen failed:", listingR.reason);
 
-  const comps = [...ebaySold, ...ebayActive, ...googleComps, ...research.comps];
+  // AI-researched comp URLs are model-supplied and can be stale or point at
+  // search pages — verify them so every link in the UI lands on a real
+  // listing. eBay/Google API comps carry authoritative URLs and skip this.
+  let researchComps = research.comps;
+  try {
+    researchComps = await verifyCompLinks(research.comps);
+  } catch (err) {
+    console.error("Comp link verification failed:", err);
+  }
+
+  const comps = [...ebaySold, ...ebayActive, ...googleComps, ...researchComps];
   const aggregate = aggregatePrices(comps);
   const deal = analyzeDeal(aggregate.median, askingPrice, aggregate.sampleSize);
 
