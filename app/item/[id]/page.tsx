@@ -380,6 +380,7 @@ export default async function ItemPage({
             comps={realComps}
             itemCondition={item.condition}
             itemId={item.id}
+            searchQuery={item.searchQuery ?? item.name}
           />
           </>
         )}
