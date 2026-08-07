@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Package, ArrowRight, Receipt } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
-import { realizedPnL } from "@/lib/analysis/deal";
+import { bestSellingOption, realizedPnL } from "@/lib/analysis/deal";
 import { parseNetProceeds } from "@/lib/item";
 import { currentUserId, ownerWhere } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
@@ -35,6 +35,7 @@ export default async function InventoryPage() {
         createdAt: true,
         storageLocation: true,
         netProceeds: true,
+        category: true,
         photos: { orderBy: { order: "asc" }, take: 1, select: { url: true } },
       },
     }),
@@ -250,7 +251,9 @@ export default async function InventoryPage() {
               <div className="space-y-2">
                 {holding.map((item) => {
                   const cost = item.purchasePrice ?? item.askingPrice ?? null;
-                  const projected = parseNetProceeds(item.netProceeds)[0]?.net ?? null;
+                  const projected =
+                    bestSellingOption(parseNetProceeds(item.netProceeds), item.category)
+                      ?.net ?? null;
                   const ageDays = Math.floor(
                     (now.getTime() - (item.boughtAt ?? item.createdAt).getTime()) /
                       86400000

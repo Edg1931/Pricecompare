@@ -35,6 +35,11 @@ export default function QuickScanPage() {
 
   async function analyze() {
     if (!image) return;
+    // Same request-body guard as /scan — Vercel rejects ~4.5 MB+ with a 413.
+    if (image.length > 4_300_000) {
+      setError("That photo is too large to upload — try again a bit further away, or pick a smaller image.");
+      return;
+    }
     setStage("loading");
     setError(null);
     try {

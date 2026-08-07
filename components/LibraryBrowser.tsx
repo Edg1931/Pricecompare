@@ -175,7 +175,12 @@ export function LibraryBrowser({ items }: { items: LibItem[] }) {
         case "deal":
           return (b.dealScore ?? -1) - (a.dealScore ?? -1);
         case "profit":
-          return (b.profit ?? -Infinity) - (a.profit ?? -Infinity);
+          // Both-null must be 0, not (-Inf) - (-Inf) = NaN, which makes the
+          // sort order arbitrary.
+          if (a.profit == null && b.profit == null) return 0;
+          if (a.profit == null) return 1;
+          if (b.profit == null) return -1;
+          return b.profit - a.profit;
         case "oldest":
           if (a.boughtAt && b.boughtAt) return a.boughtAt.localeCompare(b.boughtAt);
           if (a.boughtAt) return -1;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Camera, ImagePlus, X, Sparkles, Loader2, ScanBarcode } from "lucide-react";
@@ -29,7 +29,15 @@ export default function ScanPage() {
   const [queued, setQueued] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
+  // SSR-safe capability check — a render-time check mismatches the
+  // server-rendered tree and throws hydration errors on supporting browsers.
+  const barcodeOk = useSyncExternalStore(
+    () => () => {},
+    isBarcodeSupported,
+    () => false
+  );
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading) return;
@@ -162,17 +170,40 @@ export default function ScanPage() {
           </div>
         ))}
         {images.length < 8 && (
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="grid aspect-square place-items-center rounded-xl border-2 border-dashed border-border text-muted transition hover:border-brand hover:text-brand"
-          >
-            <div className="flex flex-col items-center gap-1">
-              <ImagePlus className="h-6 w-6" />
-              <span className="text-xs">Add photo</span>
-            </div>
-          </button>
+          <>
+            {/* Camera-first, like Quick Scan — the primary flow at a sale. */}
+            <button
+              onClick={() => cameraRef.current?.click()}
+              className="grid aspect-square place-items-center rounded-xl border-2 border-dashed border-brand/50 text-brand transition hover:border-brand"
+            >
+              <div className="flex flex-col items-center gap-1">
+                <Camera className="h-6 w-6" />
+                <span className="text-xs">Take photo</span>
+              </div>
+            </button>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="grid aspect-square place-items-center rounded-xl border-2 border-dashed border-border text-muted transition hover:border-brand hover:text-brand"
+            >
+              <div className="flex flex-col items-center gap-1">
+                <ImagePlus className="h-6 w-6" />
+                <span className="text-xs">From gallery</span>
+              </div>
+            </button>
+          </>
         )}
       </div>
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          addFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
       <input
         ref={fileRef}
         type="file"
@@ -223,7 +254,7 @@ export default function ScanPage() {
               className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-border bg-surface text-muted transition hover:text-brand"
             />
           </div>
-          {isBarcodeSupported() && (
+          {barcodeOk && (
             <button
               type="button"
               onClick={() => setScanning(true)}
@@ -276,7 +307,8 @@ export default function ScanPage() {
 
       {queued && (
         <p className="rounded-xl border border-brand/40 bg-brand/10 px-4 py-3 text-sm">
-          Saved offline. It&apos;ll analyze automatically once you&apos;re back online.
+          Saved on this device. Keep this tab open — it uploads and analyzes
+          automatically when your signal comes back.
         </p>
       )}
 

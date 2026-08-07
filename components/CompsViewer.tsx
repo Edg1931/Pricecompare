@@ -58,9 +58,22 @@ export function CompsViewer({
   );
   const rankedRef = useRef(false);
 
-  // Auto-rank on first mount when image comps lack similarity scores
+  // Auto-rank on first mount when image comps lack similarity scores.
+  // Session-gated: the model can legitimately skip some comps, and without a
+  // gate every later page view refires a paid multi-image AI call forever.
   useEffect(() => {
     if (rankingState !== "idle" || rankedRef.current) return;
+    const gateKey = `simrank:${itemId}`;
+    try {
+      if (sessionStorage.getItem(gateKey)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- terminal state for an already-consumed gate, not a render-loop risk
+        setRankingState("done");
+        return;
+      }
+      sessionStorage.setItem(gateKey, "1");
+    } catch {
+      // storage unavailable (private mode) — fall through, still ranks once per mount
+    }
     rankedRef.current = true;
     setRankingState("loading");
 
@@ -88,7 +101,12 @@ export function CompsViewer({
     () => comps.filter((c) => c.listingType === "sold").length,
     [comps]
   );
-  const activeCount = comps.length - soldCount;
+  // Count only what the "Active only" filter will actually show — null
+  // listingType comps made the pill promise more than the filter delivered.
+  const activeCount = useMemo(
+    () => comps.filter((c) => c.listingType === "active").length,
+    [comps]
+  );
 
   const filtered = useMemo(() => {
     return comps.filter((c) => {

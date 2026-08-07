@@ -8,7 +8,12 @@ import { sendJson, errorMessage } from "@/lib/utils";
 import { VoiceInput } from "@/components/VoiceInput";
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  // Local date, not UTC — toISOString put evening entries on tomorrow's date
+  // (and Dec 31 receipts in the next tax year).
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 }
 
 export function AddExpenseForm({ mileageRate = MILEAGE_RATE }: { mileageRate?: number }) {

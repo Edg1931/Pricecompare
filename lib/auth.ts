@@ -25,11 +25,21 @@ export async function currentUserId(): Promise<string | null> {
 }
 
 /**
- * Prisma `where` fragment that scopes to the owner. When auth is off
- * (userId null) it returns an empty filter, preserving open-mode behavior.
+ * Prisma `where` fragment that scopes to the owner.
+ *
+ * Fail-closed: a null userId only collapses to the open-mode match-all filter
+ * when open mode is actually allowed. When auth is enabled (no session on a
+ * page render, env drift breaking `getUser`) — or in production without the
+ * explicit ALLOW_OPEN_MODE opt-in — it returns a filter that matches nothing,
+ * so server-component pages can never serve every account's data the way the
+ * API routes' ownerScope() already prevents.
  */
 export function ownerWhere(userId: string | null) {
-  return userId ? { userId } : {};
+  if (userId) return { userId };
+  const openModeAllowed =
+    !authEnabled() &&
+    (process.env.NODE_ENV !== "production" || process.env.ALLOW_OPEN_MODE === "true");
+  return openModeAllowed ? {} : { userId: "__no_session__" };
 }
 
 /**

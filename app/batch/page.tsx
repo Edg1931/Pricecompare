@@ -57,6 +57,9 @@ export default function BatchPage() {
         body: JSON.stringify({ images: [job.src], askingPrice: null }),
       });
       const data = await readJson(res);
+      if (typeof data.id !== "string") {
+        throw new Error("The server didn't return a saved item.");
+      }
 
       let name: string | undefined;
       let verdict: string | null = null;

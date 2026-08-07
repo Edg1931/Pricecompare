@@ -20,7 +20,7 @@ import {
   parsePriceTrend,
   parseDemand,
 } from "@/lib/item";
-import { sourcingMetrics, negotiation } from "@/lib/analysis/deal";
+import { sourcingMetrics, negotiation, bestSellingOption } from "@/lib/analysis/deal";
 import { currentUserId } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { formatCurrency } from "@/lib/utils";
@@ -106,11 +106,14 @@ export default async function ItemPage({
   }));
   const sku = skuFor(item.id);
   const h = await headers();
-  const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
-  const qrDataUrl = await QRCode.toDataURL(`${origin}/item/${item.id}`, {
-    margin: 1,
-    width: 240,
-  }).catch(() => "");
+  const host = h.get("host");
+  // No host header → no QR rather than a QR encoding "https://null/item/…".
+  const qrDataUrl = host
+    ? await QRCode.toDataURL(
+        `${h.get("x-forwarded-proto") ?? "https"}://${host}/item/${item.id}`,
+        { margin: 1, width: 240 }
+      ).catch(() => "")
+    : "";
   const market = marketplaceLinks(item.searchQuery ?? item.name);
   const crossListings = buildCrossListings({
     name: item.name,
@@ -204,7 +207,7 @@ export default async function ItemPage({
               soldMarketplace={item.soldMarketplace}
               soldFees={item.soldFees}
               shippingCost={item.shippingCost}
-              projectedNet={netProceeds[0]?.net ?? null}
+              projectedNet={bestSellingOption(netProceeds, item.category)?.net ?? null}
               bestPlatform={item.bestPlatform}
               taxRate={settings.taxRate}
               defaultMarketplace={settings.defaultMarketplace}
@@ -222,7 +225,11 @@ export default async function ItemPage({
               qrDataUrl={qrDataUrl}
               sku={sku}
               name={item.name}
-              price={formatCurrency(item.recommendedMedian ?? item.askingPrice)}
+              price={
+                (item.recommendedMedian ?? item.askingPrice) != null
+                  ? formatCurrency(item.recommendedMedian ?? item.askingPrice)
+                  : ""
+              }
               location={item.storageLocation}
             />
           </Card>
@@ -392,8 +399,11 @@ export default async function ItemPage({
           Left = decisions for buying. Right = actions for selling. */}
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <div className="space-y-6">
-          {/* Sourcing / ROI */}
-          {sourcing && <SourcingCard metrics={sourcing} />}
+          {/* Sourcing / ROI — a buying decision; hide once the item is owned/sold */}
+          {sourcing &&
+            item.soldPrice == null &&
+            item.status !== "bought" &&
+            item.status !== "listed" && <SourcingCard metrics={sourcing} />}
 
           {/* Negotiation assistant */}
           {neg && (
@@ -481,7 +491,14 @@ export default async function ItemPage({
                   const max = netProceeds[0].net || 1;
                   return (
                     <div key={p.platform} className="flex items-center gap-3">
-                      <div className="w-32 shrink-0 text-sm">{p.platform}</div>
+                      <div className="w-32 shrink-0 text-sm">
+                        {p.platform}
+                        {p.platform === "Facebook Marketplace" && (
+                          <span className="block text-[10px] leading-tight text-muted">
+                            local pickup, no fees
+                          </span>
+                        )}
+                      </div>
                       <div className="h-6 flex-1 overflow-hidden rounded-md bg-surface-2">
                         <div
                           className="h-full rounded-md bg-gradient-to-r from-brand/70 to-accent/70"
