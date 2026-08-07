@@ -5,9 +5,9 @@ import { hasAnthropic } from "@/lib/ai/client";
 import { ownerScope, ownerWhere } from "@/lib/auth";
 
 export const runtime = "nodejs";
-// Research now runs on Opus with an internal 75s cap — leave room for the
-// eBay/Google fetches, link verification, and DB writes that follow.
-export const maxDuration = 150;
+// Research runs up to 90s on the primary model plus a 45s fallback — leave
+// room for the eBay/Google fetches, link verification, and DB writes.
+export const maxDuration = 240;
 
 export async function POST(
   _req: Request,

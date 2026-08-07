@@ -5,7 +5,7 @@ import type {
   PriceTrend,
   RawComp,
 } from "@/lib/types";
-import { getAnthropic, RESEARCH_MODEL } from "./client";
+import { getAnthropic, MODEL, RESEARCH_MODEL } from "./client";
 
 export interface ResearchResult {
   comps: RawComp[];
@@ -72,7 +72,7 @@ const VALID_SOURCES: CompSource[] = [
   "web",
 ];
 
-function extractJsonBlock(text: string): unknown | null {
+export function extractJsonBlock(text: string): unknown | null {
   // Prefer a fenced ```json block.
   const fenced = /```json\s*([\s\S]*?)```/i.exec(text);
   const candidate = fenced ? fenced[1] : null;
@@ -93,7 +93,22 @@ function extractJsonBlock(text: string): unknown | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start !== -1 && end > start) {
-    return tryParse(text.slice(start, end + 1));
+    const parsed = tryParse(text.slice(start, end + 1));
+    if (parsed) return parsed;
+  }
+  // Last resort: the output was cut off mid-JSON (max_tokens). Walk back
+  // through closing braces and try to close the comps array + root object at
+  // each one — salvaging the complete comps written before the cutoff.
+  if (start !== -1) {
+    const body = text.slice(start);
+    let attempts = 0;
+    for (let i = body.length - 1; i >= 0 && attempts < 40; i--) {
+      if (body[i] !== "}") continue;
+      attempts++;
+      const head = body.slice(0, i + 1);
+      const parsed = tryParse(head + "]}") ?? tryParse(head + "}") ?? tryParse(head);
+      if (parsed && typeof parsed === "object") return parsed;
+    }
   }
   return null;
 }
@@ -169,101 +184,134 @@ CRITICAL accuracy rules for comps:
 - For "sold" comps: only include a "url" if that exact sold price is actually viewable at that URL. eBay/marketplace sold items are often relisted at different prices, so if the link would show a different (active) price, set "url" to null.
 - Prefer fewer, verifiable comps over many uncertain ones.`;
 
-  // Hard cap at 75 s so the Vercel function always has time for the Prisma
-  // writes that follow (the items route allows 150 s total). Opus with up to
-  // 8 searches needs more room than the old 45 s Sonnet budget.
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new Error("research timeout")), 75_000);
-
-  let response;
-  try {
-    response = await anthropic.messages.create(
-      {
-        model: RESEARCH_MODEL,
-        max_tokens: 4000,
-        tools: [
-          {
-            type: "web_search_20250305",
-            name: "web_search",
-            max_uses: 8,
-          } as never,
-        ],
-        messages: [{ role: "user", content: prompt }],
-      },
-      { signal: controller.signal }
+  const runAttempt = async (
+    model: string,
+    timeoutMs: number,
+    maxUses: number,
+    maxTokens: number
+  ): Promise<ResearchResult> => {
+    // Hard cap so the Vercel function always has time for the eBay link
+    // verification and Prisma writes that follow.
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () => controller.abort(new Error("research timeout")),
+      timeoutMs
     );
-  } finally {
-    clearTimeout(timer);
-  }
 
-  const text = response.content
-    .filter((c) => c.type === "text")
-    .map((c) => (c as { text: string }).text)
-    .join("\n");
+    let response;
+    try {
+      response = await anthropic.messages.create(
+        {
+          model,
+          max_tokens: maxTokens,
+          tools: [
+            {
+              type: "web_search_20250305",
+              name: "web_search",
+              max_uses: maxUses,
+            } as never,
+          ],
+          messages: [{ role: "user", content: prompt }],
+        },
+        { signal: controller.signal }
+      );
+    } finally {
+      clearTimeout(timer);
+    }
 
-  const parsed = extractJsonBlock(text) as
-    | {
-        marketContext?: string;
-        comps?: unknown[];
-        trend?: unknown;
-        demand?: unknown;
-        retail?: unknown;
-      }
-    | null;
+    const text = response.content
+      .filter((c) => c.type === "text")
+      .map((c) => (c as { text: string }).text)
+      .join("\n");
 
-  const parseRetail = (obj: unknown): ResearchResult["retail"] => {
-    if (!obj || typeof obj !== "object") return null;
-    const r = obj as Record<string, unknown>;
-    const price = Number(r.price);
-    if (!Number.isFinite(price) || price <= 0) return null;
+    const parsed = extractJsonBlock(text) as
+      | {
+          marketContext?: string;
+          comps?: unknown[];
+          trend?: unknown;
+          demand?: unknown;
+          retail?: unknown;
+        }
+      | null;
+
+    const parseRetail = (obj: unknown): ResearchResult["retail"] => {
+      if (!obj || typeof obj !== "object") return null;
+      const r = obj as Record<string, unknown>;
+      const price = Number(r.price);
+      if (!Number.isFinite(price) || price <= 0) return null;
+      return {
+        price,
+        note: typeof r.note === "string" ? r.note.slice(0, 300) : null,
+      };
+    };
+
+    if (!parsed || !Array.isArray(parsed.comps)) {
+      return {
+        comps: [],
+        marketContext: null,
+        trend: parseTrend(parsed?.trend),
+        demand: parseDemand(parsed?.demand),
+        retail: parseRetail(parsed?.retail),
+      };
+    }
+
+    const comps: RawComp[] = [];
+    for (const c of parsed.comps) {
+      if (!c || typeof c !== "object") continue;
+      const obj = c as Record<string, unknown>;
+      const price = Number(obj.price);
+      if (!Number.isFinite(price) || price <= 0) continue;
+      const source = VALID_SOURCES.includes(obj.source as CompSource)
+        ? (obj.source as CompSource)
+        : "web";
+      comps.push({
+        source,
+        title: String(obj.title ?? descriptor).slice(0, 200),
+        price,
+        currency: "USD",
+        url: typeof obj.url === "string" ? obj.url : null,
+        imageUrl:
+          typeof obj.imageUrl === "string"
+            ? obj.imageUrl
+            : typeof obj.image === "string"
+              ? obj.image
+              : null,
+        condition: typeof obj.condition === "string" ? obj.condition : null,
+        listingType: obj.listingType === "sold" ? "sold" : "active",
+      });
+    }
+
     return {
-      price,
-      note: typeof r.note === "string" ? r.note.slice(0, 300) : null,
+      comps,
+      marketContext:
+        typeof parsed.marketContext === "string" ? parsed.marketContext : null,
+      trend: parseTrend(parsed.trend),
+      demand: parseDemand(parsed.demand),
+      retail: parseRetail(parsed.retail),
     };
   };
 
-  if (!parsed || !Array.isArray(parsed.comps)) {
-    return {
-      comps: [],
-      marketContext: null,
-      trend: parseTrend(parsed?.trend),
-      demand: parseDemand(parsed?.demand),
-      retail: parseRetail(parsed?.retail),
-    };
+  // Primary: the strong research model. If it errors (no model access,
+  // credits, API rejection, timeout) OR comes back with zero comps, fall
+  // back to the baseline model with the pre-upgrade budget — a scan must
+  // never lose ALL pricing because the premium model path failed.
+  let primaryError: unknown = null;
+  if (RESEARCH_MODEL !== MODEL) {
+    try {
+      const result = await runAttempt(RESEARCH_MODEL, 90_000, 8, 6000);
+      if (result.comps.length > 0) return result;
+      console.error(
+        `Research on ${RESEARCH_MODEL} returned 0 comps — falling back to ${MODEL}`
+      );
+    } catch (err) {
+      primaryError = err;
+      console.error(`Research on ${RESEARCH_MODEL} failed, falling back to ${MODEL}:`, err);
+    }
   }
-
-  const comps: RawComp[] = [];
-  for (const c of parsed.comps) {
-    if (!c || typeof c !== "object") continue;
-    const obj = c as Record<string, unknown>;
-    const price = Number(obj.price);
-    if (!Number.isFinite(price) || price <= 0) continue;
-    const source = VALID_SOURCES.includes(obj.source as CompSource)
-      ? (obj.source as CompSource)
-      : "web";
-    comps.push({
-      source,
-      title: String(obj.title ?? descriptor).slice(0, 200),
-      price,
-      currency: "USD",
-      url: typeof obj.url === "string" ? obj.url : null,
-      imageUrl:
-        typeof obj.imageUrl === "string"
-          ? obj.imageUrl
-          : typeof obj.image === "string"
-            ? obj.image
-            : null,
-      condition: typeof obj.condition === "string" ? obj.condition : null,
-      listingType: obj.listingType === "sold" ? "sold" : "active",
-    });
+  try {
+    return await runAttempt(MODEL, 45_000, 5, 3000);
+  } catch (err) {
+    // Surface the primary failure if both died — it's the more informative one.
+    throw primaryError ?? err;
   }
-
-  return {
-    comps,
-    marketContext:
-      typeof parsed.marketContext === "string" ? parsed.marketContext : null,
-    trend: parseTrend(parsed.trend),
-    demand: parseDemand(parsed.demand),
-    retail: parseRetail(parsed.retail),
-  };
 }

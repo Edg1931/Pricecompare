@@ -41,11 +41,11 @@ export async function GET(req: Request) {
   let errors = 0;
   const CONCURRENCY = 3;
 
-  // Only start a new batch if the worst-case batch (~90s: 75s Opus research
-  // cap + fetches, verification, and DB writes) still fits inside
-  // maxDuration. Starting a batch we can't finish means Vercel kills the
-  // function mid-write.
-  const BUDGET_MS = (maxDuration - 95) * 1000;
+  // Only start a new batch if the worst-case batch (~150s: 90s primary
+  // research + 45s fallback + fetches, verification, and DB writes) still
+  // fits inside maxDuration. Starting a batch we can't finish means Vercel
+  // kills the function mid-write.
+  const BUDGET_MS = (maxDuration - 155) * 1000;
 
   for (let i = 0; i < items.length; i += CONCURRENCY) {
     if (Date.now() - start > BUDGET_MS) break;
