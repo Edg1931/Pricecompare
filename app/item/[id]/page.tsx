@@ -55,40 +55,7 @@ import {
 } from "@/components/ItemControls";
 import { PrintLabelButton } from "@/components/PrintLabel";
 
-export default async function ItemPage(props: {
-  params: Promise<{ id: string }>;
-}) {
-  // TEMPORARY DIAGNOSTIC WRAPPER: production strips server-error messages
-  // (users only see a digest), and the deploy platform's logs are not
-  // reachable from this session. Render the real error on-page for this
-  // single-user app so the failure is identifiable, then remove.
-  try {
-    return await ItemPageInner(props);
-  } catch (err) {
-    const digest = (err as { digest?: string })?.digest;
-    // Never swallow Next.js control flow (notFound/redirect).
-    if (typeof digest === "string" && digest.startsWith("NEXT_")) throw err;
-    const message = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? (err.stack ?? "").split("\n").slice(0, 6).join("\n") : "";
-    return (
-      <div className="mx-auto max-w-2xl space-y-4 rounded-2xl border border-over/40 bg-over/10 p-6">
-        <h1 className="text-lg font-bold text-over">
-          Item page failed to render — diagnostic
-        </h1>
-        <p className="text-sm text-muted">
-          Temporary debug view. Send this message to Claude:
-        </p>
-        <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-surface-2 p-4 text-xs">
-          {message}
-          {"\n\n"}
-          {stack}
-        </pre>
-      </div>
-    );
-  }
-}
-
-async function ItemPageInner({
+export default async function ItemPage({
   params,
 }: {
   params: Promise<{ id: string }>;
