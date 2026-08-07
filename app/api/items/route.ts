@@ -9,10 +9,10 @@ import { authEnabled } from "@/lib/supabase/config";
 import type { ItemIdentification } from "@/lib/types";
 
 export const runtime = "nodejs";
-// Vision (up to 40s) + research (up to 45s) + comp verification + DB writes
-// can legitimately exceed 60s; a mid-flight kill costs the AI spend and
-// saves nothing. Fluid compute allows 300s even on Hobby.
-export const maxDuration = 150;
+// Vision (up to 40s) + research (up to 90s primary + 45s fallback) + comp
+// verification + DB writes; a mid-flight kill costs the AI spend and saves
+// nothing. Fluid compute allows 300s even on Hobby.
+export const maxDuration = 240;
 
 // When provided, an already-identified item (e.g. from lot mode) skips vision
 // and goes straight to pricing.
