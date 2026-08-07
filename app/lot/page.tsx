@@ -17,11 +17,13 @@ import { formatCurrency, readJson } from "@/lib/utils";
 import { VerdictBadge } from "@/components/ui";
 import type { ItemIdentification, Verdict } from "@/lib/types";
 
+type LotIdent = ItemIdentification & { imageIndex?: number | null };
+
 type Status = "pending" | "running" | "done" | "error";
 
 interface LotItem {
   id: number;
-  ident: ItemIdentification;
+  ident: LotIdent;
   include: boolean;
   status: Status;
   itemId?: string;
@@ -50,6 +52,12 @@ export default function LotPage() {
 
   async function findItems() {
     if (images.length === 0) return;
+    // Stay under Vercel's ~4.5 MB request-body limit (same guard as /scan).
+    const payloadBytes = images.reduce((sum, src) => sum + src.length, 0);
+    if (payloadBytes > 4_300_000) {
+      setError("These photos are too large to upload together — remove one or two and try again.");
+      return;
+    }
     setIdentifying(true);
     setError(null);
     try {
@@ -59,7 +67,7 @@ export default function LotPage() {
         body: JSON.stringify({ images, hint: hint.trim() || undefined }),
       });
       const data = await readJson(res);
-      const detected = (data.items as ItemIdentification[]) ?? [];
+      const detected = (data.items as LotIdent[]) ?? [];
       if (detected.length === 0) {
         setError("No resellable items were detected. Try a clearer photo.");
       }
@@ -85,10 +93,16 @@ export default function LotPage() {
   async function priceOne(it: LotItem, force?: boolean) {
     update(it.id, { status: "running", error: undefined, duplicateOf: undefined });
     try {
+      // Attach only the photo this item was spotted in — sending the whole
+      // pile gave every lot item identical wrong photo sets and re-uploaded
+      // N× the data (blowing Vercel's body limit on big lots).
+      const idx = it.ident.imageIndex;
+      const itemImages =
+        idx != null && idx >= 0 && idx < images.length ? [images[idx]] : [images[0]];
       const res = await fetch("/api/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images, identification: it.ident, force }),
+        body: JSON.stringify({ images: itemImages, identification: it.ident, force }),
       });
       if (res.status === 409) {
         const d = await res.json() as { existingId?: string };

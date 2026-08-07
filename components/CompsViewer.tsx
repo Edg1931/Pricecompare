@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, ImageOff, Sparkles } from "lucide-react";
+import { ExternalLink, ImageOff, Search, Sparkles } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { sourceMeta } from "@/lib/display";
+import { searchUrlForSource } from "@/lib/marketplaces";
 
 export type CompForViewer = {
   id: string;
@@ -30,10 +31,12 @@ export function CompsViewer({
   comps: initialComps,
   itemCondition,
   itemId,
+  searchQuery,
 }: {
   comps: CompForViewer[];
   itemCondition: string | null;
   itemId: string;
+  searchQuery?: string | null;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [matchCondition, setMatchCondition] = useState(false);
@@ -55,9 +58,22 @@ export function CompsViewer({
   );
   const rankedRef = useRef(false);
 
-  // Auto-rank on first mount when image comps lack similarity scores
+  // Auto-rank on first mount when image comps lack similarity scores.
+  // Session-gated: the model can legitimately skip some comps, and without a
+  // gate every later page view refires a paid multi-image AI call forever.
   useEffect(() => {
     if (rankingState !== "idle" || rankedRef.current) return;
+    const gateKey = `simrank:${itemId}`;
+    try {
+      if (sessionStorage.getItem(gateKey)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- terminal state for an already-consumed gate, not a render-loop risk
+        setRankingState("done");
+        return;
+      }
+      sessionStorage.setItem(gateKey, "1");
+    } catch {
+      // storage unavailable (private mode) — fall through, still ranks once per mount
+    }
     rankedRef.current = true;
     setRankingState("loading");
 
@@ -85,7 +101,12 @@ export function CompsViewer({
     () => comps.filter((c) => c.listingType === "sold").length,
     [comps]
   );
-  const activeCount = comps.length - soldCount;
+  // Count only what the "Active only" filter will actually show — null
+  // listingType comps made the pill promise more than the filter delivered.
+  const activeCount = useMemo(
+    () => comps.filter((c) => c.listingType === "active").length,
+    [comps]
+  );
 
   const filtered = useMemo(() => {
     return comps.filter((c) => {
@@ -172,7 +193,7 @@ export function CompsViewer({
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                   {srcComps.map((c) => (
-                    <CompTile key={c.id} comp={c} />
+                    <CompTile key={c.id} comp={c} searchQuery={searchQuery} />
                   ))}
                 </div>
               </div>
@@ -180,7 +201,7 @@ export function CompsViewer({
           })}
 
           {withoutImage.length > 0 && (
-            <CompactList comps={withoutImage} />
+            <CompactList comps={withoutImage} searchQuery={searchQuery} />
           )}
         </div>
       )}
@@ -212,8 +233,19 @@ function FilterPill({
   );
 }
 
-function CompTile({ comp: c }: { comp: CompForViewer }) {
+function CompTile({
+  comp: c,
+  searchQuery,
+}: {
+  comp: CompForViewer;
+  searchQuery?: string | null;
+}) {
   const badge = c.similarity != null ? simBadge(c.similarity) : null;
+  // No direct listing link? Fall back to a live search on the comp's own
+  // marketplace so every price is still verifiable with one tap.
+  const fallbackUrl = searchQuery ? searchUrlForSource(c.source, searchQuery) : null;
+  const href = c.url ?? fallbackUrl;
+  const isDirect = Boolean(c.url);
 
   const inner = (
     <>
@@ -251,9 +283,11 @@ function CompTile({ comp: c }: { comp: CompForViewer }) {
           <span className="font-semibold tabular-nums">
             {formatCurrency(c.price, c.currency ?? "USD")}
           </span>
-          {c.url && (
+          {isDirect ? (
             <ExternalLink className="h-3 w-3 shrink-0 text-muted transition group-hover:text-brand" />
-          )}
+          ) : href ? (
+            <Search className="h-3 w-3 shrink-0 text-muted transition group-hover:text-brand" />
+          ) : null}
         </div>
         <span className="line-clamp-2 text-xs leading-snug text-muted">
           {c.title}
@@ -263,12 +297,12 @@ function CompTile({ comp: c }: { comp: CompForViewer }) {
   );
   const cls =
     "group flex flex-col overflow-hidden rounded-lg border border-border bg-surface-2/40 transition hover:border-brand hover:bg-surface-2";
-  return c.url ? (
+  return href ? (
     <a
-      href={c.url}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
-      title={c.title}
+      title={isDirect ? c.title : `${c.title} — no direct link; opens a live search`}
       className={cls}
     >
       {inner}
@@ -278,7 +312,13 @@ function CompTile({ comp: c }: { comp: CompForViewer }) {
   );
 }
 
-function CompactList({ comps }: { comps: CompForViewer[] }) {
+function CompactList({
+  comps,
+  searchQuery,
+}: {
+  comps: CompForViewer[];
+  searchQuery?: string | null;
+}) {
   const grouped = new Map<string, CompForViewer[]>();
   for (const c of comps) {
     const arr = grouped.get(c.source) ?? [];
@@ -302,15 +342,22 @@ function CompactList({ comps }: { comps: CompForViewer[] }) {
                 <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
                 {meta.label}
               </span>
-              {srcComps.map((c) =>
-                c.url ? (
+              {srcComps.map((c) => {
+                const href =
+                  c.url ??
+                  (searchQuery ? searchUrlForSource(c.source, searchQuery) : null);
+                return href ? (
                   <a
                     key={c.id}
-                    href={c.url}
+                    href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={c.title}
-                    className="text-sm font-medium tabular-nums text-fg/90 transition hover:text-brand"
+                    title={
+                      c.url
+                        ? c.title
+                        : `${c.title} — no direct link; opens a live search`
+                    }
+                    className={`text-sm font-medium tabular-nums transition hover:text-brand ${c.url ? "text-fg/90" : "text-muted"}`}
                   >
                     {formatCurrency(c.price, c.currency ?? "USD")}
                     {c.listingType === "sold" && (
@@ -327,8 +374,8 @@ function CompactList({ comps }: { comps: CompForViewer[] }) {
                   >
                     {formatCurrency(c.price, c.currency ?? "USD")}
                   </span>
-                )
-              )}
+                );
+              })}
             </div>
           );
         })}

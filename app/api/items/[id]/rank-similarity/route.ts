@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { currentUserId, ownerWhere } from "@/lib/auth";
+import { ownerScope, ownerWhere } from "@/lib/auth";
 import { getAnthropic } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
@@ -75,17 +75,21 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const userId = await currentUserId();
-  if (!userId) {
+  // ownerScope like every other data route — the hard userId check meant
+  // similarity ranking always 401'd in open mode.
+  const scope = await ownerScope();
+  if (!scope.ok) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const item = await prisma.item.findFirst({
-    where: { id, ...ownerWhere(userId) },
+    where: { id, ...ownerWhere(scope.userId) },
     include: {
       photos: { orderBy: { order: "asc" }, take: 3 },
       comps: {
-        where: { imageUrl: { not: null } },
+        // URL image blocks require absolute URLs — local-dev relative photo
+        // paths can't be fetched by the model.
+        where: { imageUrl: { startsWith: "http" } },
         orderBy: { capturedAt: "desc" },
         take: 14,
       },
@@ -119,12 +123,16 @@ export async function POST(
 
   let scores: Array<{ id: string; similarity: number }> = [];
   try {
-    const response = await anthropic.messages.create({
-      model: SIM_MODEL,
-      max_tokens: 800,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      messages: [{ role: "user", content: content as any }],
-    });
+    const response = await anthropic.messages.create(
+      {
+        model: SIM_MODEL,
+        max_tokens: 800,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        messages: [{ role: "user", content: content as any }],
+      },
+      // Bound the call — the SDK default timeout is 10 minutes.
+      { timeout: 25_000, maxRetries: 1 }
+    );
 
     const text = response.content
       .filter((c) => c.type === "text")
@@ -146,15 +154,18 @@ export async function POST(
     return NextResponse.json({ error: "AI ranking failed" }, { status: 500 });
   }
 
-  // Persist scores to DB; skip any IDs that don't belong to this item.
+  // Persist scores in one transaction; skip IDs that don't belong to this item.
   const validIds = new Set(compsWithImages.map((c) => c.id));
-  let updated = 0;
-  for (const score of scores) {
-    if (!validIds.has(score.id)) continue;
-    const sim = Math.min(100, Math.max(0, Math.round(score.similarity)));
-    await prisma.comp.update({ where: { id: score.id }, data: { similarity: sim } });
-    updated++;
-  }
+  const writes = scores
+    .filter((s) => validIds.has(s.id))
+    .map((s) =>
+      prisma.comp.update({
+        where: { id: s.id },
+        data: { similarity: Math.min(100, Math.max(0, Math.round(s.similarity))) },
+      })
+    );
+  if (writes.length > 0) await prisma.$transaction(writes);
+  const updated = writes.length;
 
   const result: Record<string, number> = {};
   for (const score of scores) {

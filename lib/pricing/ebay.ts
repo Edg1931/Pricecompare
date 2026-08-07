@@ -56,16 +56,28 @@ async function getToken(scope: string): Promise<string | null> {
   }
 }
 
-// One-off image lookup for an existing eBay listing URL. Used by the backfill
-// route to populate `imageUrl` on Comp rows that were created before the
-// image-saving code shipped. Returns null if the URL doesn't look like an
-// eBay item URL, the token can't be fetched, or eBay doesn't return an image.
-export async function fetchEbayItemImage(itemUrl: string): Promise<string | null> {
+export interface EbayLiveItem {
+  title: string | null;
+  price: number | null;
+  currency: string | null;
+  url: string | null;
+  imageUrl: string | null;
+}
+
+/**
+ * Authoritative lookup of an eBay listing by its /itm/ URL via the Browse API.
+ * Returns the live listing data, "not_found" when eBay says the item doesn't
+ * exist (dead link), "error" on auth/network problems (verdict unknown), or
+ * null when the URL isn't an eBay item URL at all.
+ */
+export async function lookupEbayItemByUrl(
+  itemUrl: string
+): Promise<EbayLiveItem | "not_found" | "error" | null> {
   const match = itemUrl.match(/\/itm\/(?:[^/]+\/)?(\d{10,15})/);
   if (!match) return null;
   const legacyId = match[1];
   const token = await getToken(BASE_SCOPE);
-  if (!token) return null;
+  if (!token) return "error";
 
   try {
     const res = await fetch(
@@ -75,21 +87,37 @@ export async function fetchEbayItemImage(itemUrl: string): Promise<string | null
           Authorization: `Bearer ${token}`,
           "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
         },
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(6_000),
       }
     );
-    if (!res.ok) return null;
+    if (res.status === 404) return "not_found";
+    if (!res.ok) return "error";
     const data = (await res.json()) as {
+      title?: string;
+      price?: { value?: string; currency?: string };
+      itemWebUrl?: string;
       image?: { imageUrl?: string };
       thumbnailImages?: Array<{ imageUrl?: string }>;
     };
-    return (
-      data.image?.imageUrl ?? data.thumbnailImages?.[0]?.imageUrl ?? null
-    );
+    const price = Number(data.price?.value);
+    return {
+      title: data.title ?? null,
+      price: Number.isFinite(price) && price > 0 ? price : null,
+      currency: data.price?.currency ?? null,
+      url: data.itemWebUrl ?? null,
+      imageUrl:
+        data.image?.imageUrl ?? data.thumbnailImages?.[0]?.imageUrl ?? null,
+    };
   } catch (err) {
     console.error("eBay item lookup error:", err);
-    return null;
+    return "error";
   }
+}
+
+// Back-compat image-only wrapper, used by the comp-image backfill route.
+export async function fetchEbayItemImage(itemUrl: string): Promise<string | null> {
+  const live = await lookupEbayItemByUrl(itemUrl);
+  return live && typeof live === "object" ? live.imageUrl : null;
 }
 
 export async function searchEbay(query: string, limit = 20): Promise<RawComp[]> {

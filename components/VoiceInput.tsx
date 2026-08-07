@@ -1,6 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
+
+const emptySubscribe = () => () => {};
 import { Mic } from "lucide-react";
 
 interface SpeechRecognitionLike {
@@ -39,9 +41,12 @@ export function VoiceInput({
   className?: string;
 }) {
   const [listening, setListening] = useState(false);
+  // SSR-safe capability check: the server snapshot is false, so the initial
+  // client render matches and the mic appears after hydration — no mismatch.
+  const supported = useSyncExternalStore(emptySubscribe, isVoiceSupported, () => false);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
 
-  if (!isVoiceSupported()) return null;
+  if (!supported) return null;
 
   function toggle() {
     if (listening) {

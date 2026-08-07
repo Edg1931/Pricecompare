@@ -5,12 +5,15 @@ import Link from "next/link";
 import { Camera, Zap, RotateCcw } from "lucide-react";
 import { fileToDataUrl } from "@/lib/image";
 import { readJson, formatCurrency } from "@/lib/utils";
+import { searchUrlForSource } from "@/lib/marketplaces";
+import { negotiation } from "@/lib/analysis/deal";
 import type { Verdict } from "@/lib/types";
 
 interface ItemResult {
   id: string;
   verdict: Verdict | null;
   recommendedMedian: number | null;
+  searchQuery: string | null;
 }
 
 type Stage = "idle" | "loading" | "result";
@@ -32,6 +35,11 @@ export default function QuickScanPage() {
 
   async function analyze() {
     if (!image) return;
+    // Same request-body guard as /scan — Vercel rejects ~4.5 MB+ with a 413.
+    if (image.length > 4_300_000) {
+      setError("That photo is too large to upload — try again a bit further away, or pick a smaller image.");
+      return;
+    }
     setStage("loading");
     setError(null);
     try {
@@ -47,13 +55,27 @@ export default function QuickScanPage() {
       }
       // Fetch full item data to get verdict + recommendedMedian.
       // The API wraps the payload as { item: {...} }.
-      const itemRes = await fetch(`/api/items/${data.id}`);
-      const detail = await readJson(itemRes);
-      const item = (detail.item ?? {}) as { verdict?: Verdict | null; recommendedMedian?: number | null };
+      // The analysis is already paid for and saved at this point — if this
+      // follow-up read fails, still show the result screen (NO VERDICT) with
+      // the link to the saved item rather than throwing the work away.
+      let item: {
+        verdict?: Verdict | null;
+        recommendedMedian?: number | null;
+        searchQuery?: string | null;
+        name?: string | null;
+      } = {};
+      try {
+        const itemRes = await fetch(`/api/items/${data.id}`);
+        const detail = await readJson(itemRes);
+        item = (detail.item ?? {}) as typeof item;
+      } catch {
+        // Fall through with empty item — the saved analysis is still linked.
+      }
       setResult({
         id: data.id,
         verdict: item.verdict ?? null,
         recommendedMedian: typeof item.recommendedMedian === "number" ? item.recommendedMedian : null,
+        searchQuery: item.searchQuery ?? item.name ?? null,
       });
       setStage("result");
     } catch (err) {
@@ -102,7 +124,9 @@ export default function QuickScanPage() {
     if (verdict === "STEAL") {
       cardClass = "bg-steal/20 border-steal/40 text-steal";
       headlineText = "BUY IT";
-      subText = `Max buy: ${formatCurrency(median * 0.6)}`;
+      // Same rounded ceiling the item page's negotiation card shows.
+      const maxBuy = negotiation(median, null)?.maxBuy;
+      subText = maxBuy != null ? `Max buy: ${formatCurrency(maxBuy)}` : `Worth ~${formatCurrency(median)}`;
     } else if (verdict === "GOOD") {
       cardClass = "bg-steal/20 border-steal/40 text-steal";
       headlineText = "GOOD DEAL";
@@ -111,11 +135,18 @@ export default function QuickScanPage() {
       cardClass = "bg-yellow-500/15 border-yellow-500/30 text-yellow-600";
       headlineText = "FAIR PRICE";
       subText = `Worth ~${formatCurrency(median)}`;
-    } else {
-      // OVERPRICED or null
+    } else if (verdict === "OVERPRICED") {
       cardClass = "bg-over/15 border-over/30 text-over";
       headlineText = "PASS";
       subText = `Only worth ~${formatCurrency(median)}`;
+    } else {
+      // No verdict — too little market data to call it either way.
+      cardClass = "bg-surface-2 border-border text-fg";
+      headlineText = "NO VERDICT";
+      subText =
+        recommendedMedian != null
+          ? `Maybe ~${formatCurrency(median)} — not enough comps to be sure`
+          : "Not enough market data — check eBay sold prices below";
     }
 
     return (
@@ -128,13 +159,25 @@ export default function QuickScanPage() {
           <p className="text-xl font-semibold opacity-90">{subText}</p>
         </div>
 
-        {/* See full analysis link */}
-        <Link
-          href={`/item/${id}`}
-          className="text-sm font-medium text-brand underline underline-offset-2 hover:opacity-80"
-        >
-          See full analysis
-        </Link>
+        {/* See full analysis + live verification links */}
+        <div className="flex flex-col items-center gap-2">
+          <Link
+            href={`/item/${id}`}
+            className="text-sm font-medium text-brand underline underline-offset-2 hover:opacity-80"
+          >
+            See full analysis
+          </Link>
+          {result.searchQuery && (
+            <a
+              href={searchUrlForSource("ebay", result.searchQuery)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-muted underline underline-offset-2 hover:text-fg"
+            >
+              Verify on eBay sold listings ↗
+            </a>
+          )}
+        </div>
 
         {/* Scan another */}
         <button

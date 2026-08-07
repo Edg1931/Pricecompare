@@ -65,20 +65,31 @@ export async function PATCH(
     boughtAtUpdate = { boughtAt: new Date() };
   }
 
-  // Stamp/clear the sale date when the sold price is set or removed.
+  // Stamp/clear the sale date when the sold price is set or removed. Clearing
+  // also wipes the other sale fields so no orphaned fees/marketplace linger.
   let soldAtUpdate = {};
   if (data.soldPrice !== undefined) {
     if (data.soldPrice != null && !existing.soldAt) {
       soldAtUpdate = { soldAt: new Date() };
     } else if (data.soldPrice == null) {
-      soldAtUpdate = { soldAt: null };
+      soldAtUpdate = {
+        soldAt: null,
+        ...(data.soldMarketplace === undefined ? { soldMarketplace: null } : {}),
+        ...(data.soldFees === undefined ? { soldFees: null } : {}),
+        ...(data.shippingCost === undefined ? { shippingCost: null } : {}),
+      };
     }
   }
 
   // If the asking price changed, recompute the deal locally (no new AI calls).
   let dealUpdate = {};
   if ("askingPrice" in data) {
-    const deal = analyzeDeal(existing.recommendedMedian, data.askingPrice ?? null, existing.sampleSize);
+    const deal = analyzeDeal(
+      existing.recommendedMedian,
+      data.askingPrice ?? null,
+      existing.sampleSize,
+      data.category !== undefined ? data.category : existing.category
+    );
     dealUpdate = {
       dealScore: deal.dealScore,
       verdict: deal.verdict,
@@ -132,10 +143,14 @@ export async function DELETE(
     where: { id, ...ownerWhere(scope.userId) },
     select: { photos: { select: { url: true } } },
   });
-  if (item) {
-    await deletePhotos(item.photos.map((p) => p.url));
-  }
+  if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  await deletePhotos(item.photos.map((p) => p.url));
 
-  await prisma.item.deleteMany({ where: { id, ...ownerWhere(scope.userId) } }).catch(() => null);
+  const deleted = await prisma.item
+    .deleteMany({ where: { id, ...ownerWhere(scope.userId) } })
+    .catch(() => null);
+  if (!deleted || deleted.count === 0) {
+    return NextResponse.json({ error: "Delete failed." }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }

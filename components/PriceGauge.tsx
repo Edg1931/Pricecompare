@@ -15,7 +15,9 @@ export function PriceGauge({
     return null;
   }
 
-  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+  // Keep 4% margin so the "YOU" bubble (centered on the point) can't hang
+  // half off the card when asking is outside the low–high range.
+  const clamp = (v: number) => Math.max(4, Math.min(96, v));
   const toPct = (v: number) => clamp(((v - low) / (high - low)) * 100);
   const medianPct = toPct(median);
   const askingPct = asking !== null ? toPct(asking) : null;

@@ -87,6 +87,11 @@ const LOT_TOOL = {
               description: "Optimized marketplace search query for this item.",
             },
             confidence: { type: "number", description: "0 to 1." },
+            imageIndex: {
+              type: "number",
+              description:
+                "0-based index of the photo where this item is most clearly visible.",
+            },
             note: {
               type: "string",
               description: "Where it is in the photo / how to tell it apart.",
@@ -100,10 +105,15 @@ const LOT_TOOL = {
   },
 };
 
+export type LotIdentification = ItemIdentification & {
+  /** 0-based index of the lot photo this item is most visible in. */
+  imageIndex: number | null;
+};
+
 export async function identifyLot(
   imageDataUrls: string[],
   userHint?: string
-): Promise<ItemIdentification[]> {
+): Promise<LotIdentification[]> {
   const anthropic = getAnthropic();
 
   const imageBlocks = imageDataUrls.slice(0, 8).map((url) => {
@@ -114,7 +124,7 @@ export async function identifyLot(
     };
   });
 
-  const promptText = `You are an expert reseller going through a pile, box, or lot of items. These ${imageBlocks.length} photo(s) contain MULTIPLE different items. Identify EACH distinct resellable item separately — up to 20. Use every visible clue (logos, tags, shapes). Give each a concise name and an optimized marketplace search query. Group identical duplicates into one entry. Skip obvious trash.${
+  const promptText = `You are an expert reseller going through a pile, box, or lot of items. These ${imageBlocks.length} photo(s) contain MULTIPLE different items. Identify EACH distinct resellable item separately — up to 20. Use every visible clue (logos, tags, shapes). Give each a concise name, an optimized marketplace search query, and the 0-based imageIndex of the photo it is most clearly visible in. Group identical duplicates into one entry. Skip obvious trash.${
     userHint ? `\n\nThe user added this hint: "${userHint}"` : ""
   }\n\nThen call the report_items tool.`;
 
@@ -157,6 +167,13 @@ export async function identifyLot(
           ? Math.max(0, Math.min(1, it.confidence))
           : 0.5,
       reasoning: (it.note as string) ?? null,
+      imageIndex:
+        typeof it.imageIndex === "number" &&
+        Number.isInteger(it.imageIndex) &&
+        it.imageIndex >= 0 &&
+        it.imageIndex < imageDataUrls.length
+          ? it.imageIndex
+          : null,
     }))
     .filter((it) => it.name && it.searchQuery);
 }

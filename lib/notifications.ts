@@ -13,6 +13,14 @@ async function getUserEmail(userId: string): Promise<string | null> {
   }
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function buildAlertHtml(params: {
   itemName: string;
   median: number;
@@ -21,7 +29,9 @@ function buildAlertHtml(params: {
   itemId: string;
   siteUrl: string;
 }): string {
-  const { itemName, median, target, direction, itemId, siteUrl } = params;
+  const { median, target, direction, itemId, siteUrl } = params;
+  // AI-generated name goes into HTML — escape it.
+  const itemName = escapeHtml(params.itemName);
   const verb = direction === "above" ? "risen to" : "dropped to";
   const label = direction === "above" ? "above" : "below";
   const formattedMedian = `$${median.toFixed(2)}`;

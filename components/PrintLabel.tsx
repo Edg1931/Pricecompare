@@ -16,11 +16,9 @@ export function PrintLabelButton({
   location: string | null;
 }) {
   function print() {
-    const w = window.open("", "_blank", "width=420,height=520");
-    if (!w) return;
     const esc = (s: string) =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    w.document.write(`<!doctype html><html><head><title>${esc(sku)}</title>
+    const html = `<!doctype html><html><head><title>${esc(sku)}</title>
       <style>
         * { box-sizing: border-box; }
         body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 16px; }
@@ -37,9 +35,39 @@ export function PrintLabelButton({
         <div class="name">${esc(name)}</div>
         <div class="meta">${esc(price)}${location ? " &middot; " + esc(location) : ""}</div>
       </div>
-      <script>window.onload = function(){ window.print(); }</script>
-      </body></html>`);
-    w.document.close();
+      </body></html>`;
+
+    const w = window.open("", "_blank", "width=420,height=520");
+    if (w) {
+      w.document.write(html + `<script>window.onload = function(){ window.print(); }</script>`);
+      w.document.close();
+      return;
+    }
+
+    // Popup blocked (default on mobile Safari — the primary device): print
+    // from a hidden same-page iframe instead of silently doing nothing.
+    const frame = document.createElement("iframe");
+    frame.style.position = "fixed";
+    frame.style.right = "0";
+    frame.style.bottom = "0";
+    frame.style.width = "0";
+    frame.style.height = "0";
+    frame.style.border = "0";
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument;
+    if (!doc) {
+      document.body.removeChild(frame);
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    frame.onload = () => {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+      // Give the print dialog time to grab the content before cleanup.
+      setTimeout(() => document.body.removeChild(frame), 60_000);
+    };
   }
 
   return (

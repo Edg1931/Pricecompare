@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Check, Copy, Link2, Share2 } from "lucide-react";
+
+const emptySubscribe = () => () => {};
 
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -44,7 +46,13 @@ export function ShareButton({ title }: { title: string }) {
     }
   }
 
-  const canShare = typeof navigator !== "undefined" && "share" in navigator;
+  // SSR-safe capability check (server snapshot false) — checking navigator
+  // during render mismatched the server-rendered icon and threw on hydration.
+  const canShare = useSyncExternalStore(
+    emptySubscribe,
+    () => typeof navigator !== "undefined" && "share" in navigator,
+    () => false
+  );
 
   return (
     <button

@@ -30,15 +30,65 @@ export function negotiation(
 }
 
 /** Approximate seller fee models per platform (estimates; fees change over time). */
-const PLATFORM_FEES: { platform: string; pct: number; fixed: number }[] = [
+const PLATFORM_FEES: {
+  platform: string;
+  pct: number;
+  fixed: number;
+  /** Local-only channel: no fee, but no shipping reach — never the default recommendation. */
+  local?: boolean;
+  /** Specialist marketplace: only recommended when the item's category matches. */
+  categories?: RegExp;
+}[] = [
   { platform: "eBay", pct: 0.1325, fixed: 0.3 },
-  { platform: "Etsy", pct: 0.09, fixed: 0.2 },
   { platform: "Mercari", pct: 0.129, fixed: 0.5 },
-  { platform: "Poshmark", pct: 0.2, fixed: 0 },
-  { platform: "StockX", pct: 0.1, fixed: 0 },
-  { platform: "Swappa", pct: 0.03, fixed: 0 },
-  { platform: "Facebook Marketplace", pct: 0.0, fixed: 0 }, // local pickup
+  {
+    platform: "Etsy",
+    pct: 0.09,
+    fixed: 0.2,
+    categories: /vintage|antique|handmade|craft|art|collectib|home|decor|jewelr/i,
+  },
+  {
+    platform: "Poshmark",
+    pct: 0.2,
+    fixed: 0,
+    categories: /cloth|apparel|fashion|shoe|sneaker|dress|jacket|coat|handbag|purse|bag|accessor|jewelr/i,
+  },
+  {
+    platform: "StockX",
+    pct: 0.1,
+    fixed: 0,
+    categories: /sneaker|shoe|streetwear|trading card|console/i,
+  },
+  {
+    platform: "Swappa",
+    pct: 0.03,
+    fixed: 0,
+    categories: /phone|tablet|laptop|computer|camera|console|electronic|smartwatch|tech/i,
+  },
+  { platform: "Facebook Marketplace", pct: 0.0, fixed: 0, local: true },
 ];
+
+/**
+ * The best realistic selling channel: highest net among shipping-capable
+ * marketplaces, with specialist platforms (Swappa, StockX, Poshmark, Etsy)
+ * only eligible when the item's category fits them. Facebook (0% local
+ * pickup) always tops a raw net sort, which made every "after fees" number
+ * in the app a pre-fee number — it stays in the proceeds table but is never
+ * the recommended platform.
+ */
+export function bestSellingOption(
+  netProceeds: PlatformNet[],
+  category?: string | null
+): PlatformNet | null {
+  const cat = category ?? "";
+  for (const p of netProceeds) {
+    const spec = PLATFORM_FEES.find((f) => f.platform === p.platform);
+    if (!spec || spec.local) continue;
+    if (spec.categories && !spec.categories.test(cat)) continue;
+    return p;
+  }
+  return netProceeds.find((p) => p.platform !== "Facebook Marketplace") ?? netProceeds[0] ?? null;
+}
 
 /** Marketplaces the user can pick when recording a sale. */
 export const MARKETPLACES = [
@@ -112,10 +162,11 @@ export function computeNetProceeds(salePrice: number): PlatformNet[] {
 export function sourcingMetrics(
   median: number | null,
   askingPrice: number | null,
-  netProceeds: PlatformNet[]
+  netProceeds: PlatformNet[],
+  category?: string | null
 ): SourcingMetrics | null {
   if (!median || !askingPrice || askingPrice <= 0) return null;
-  const best = netProceeds[0] ?? null;
+  const best = bestSellingOption(netProceeds, category);
   const bestNet = best?.net ?? median;
   const feePct = best?.feePct ?? 0;
   const profit = Math.round((bestNet - askingPrice) * 100) / 100;
@@ -145,10 +196,12 @@ function verdictFor(ratio: number): Verdict {
 export function analyzeDeal(
   median: number | null,
   askingPrice: number | null,
-  sampleSize?: number | null
+  sampleSize?: number | null,
+  category?: string | null
 ): DealAnalysis {
   const netProceeds = median ? computeNetProceeds(median) : [];
-  const bestPlatform = netProceeds[0]?.platform ?? null;
+  const best = bestSellingOption(netProceeds, category);
+  const bestPlatform = best?.platform ?? null;
 
   if (!median) {
     return {
@@ -192,7 +245,7 @@ export function analyzeDeal(
   // Score: 50 at market median, 100 at half price, 0 at 1.5x.
   const dealScore = Math.max(0, Math.min(100, Math.round((1 - ratio) * 100 + 50)));
 
-  const bestNet = netProceeds[0]?.net ?? median;
+  const bestNet = best?.net ?? median;
   const estimatedProfit = Math.round((bestNet - askingPrice) * 100) / 100;
 
   const summary =
