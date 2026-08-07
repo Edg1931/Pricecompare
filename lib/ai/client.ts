@@ -17,9 +17,12 @@ export function getAnthropic(): Anthropic {
 export const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
 // Pricing research drives the product's core value (the estimate), so it
-// defaults to the strongest model; vision + listing stay on the cheaper one.
-// Override with RESEARCH_MODEL to trade accuracy for cost.
+// runs a model cascade: the strongest first, then a mid fallback, then the
+// baseline MODEL. Each tier only runs if the one before it errored or found
+// nothing — so an account without Opus 5 access transparently lands on 4.8.
 export const RESEARCH_MODEL = process.env.RESEARCH_MODEL || "claude-opus-5";
+export const RESEARCH_FALLBACK_MODEL =
+  process.env.RESEARCH_FALLBACK_MODEL || "claude-opus-4-8";
 
 export function hasAnthropic() {
   return Boolean(process.env.ANTHROPIC_API_KEY);

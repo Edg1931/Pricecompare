@@ -5,7 +5,12 @@ import type {
   PriceTrend,
   RawComp,
 } from "@/lib/types";
-import { getAnthropic, MODEL, RESEARCH_MODEL } from "./client";
+import {
+  getAnthropic,
+  MODEL,
+  RESEARCH_FALLBACK_MODEL,
+  RESEARCH_MODEL,
+} from "./client";
 
 export interface ResearchResult {
   comps: RawComp[];
@@ -291,27 +296,38 @@ CRITICAL accuracy rules for comps:
     };
   };
 
-  // Primary: the strong research model. If it errors (no model access,
-  // credits, API rejection, timeout) OR comes back with zero comps, fall
-  // back to the baseline model with the pre-upgrade budget — a scan must
-  // never lose ALL pricing because the premium model path failed.
-  let primaryError: unknown = null;
-  if (RESEARCH_MODEL !== MODEL) {
+  // Model cascade: strongest first (Opus 5), then the mid fallback
+  // (Opus 4.8), then the baseline MODEL. A tier runs only if the previous
+  // one errored (no model access, credits, API rejection, timeout) or found
+  // zero comps — a scan must never lose ALL pricing because a premium model
+  // path failed. A model-access failure returns in ~1s, so the healthy tier
+  // still gets its full time; a global deadline keeps the worst case (slow
+  // timeouts at every tier) inside the route budget.
+  const chain = [...new Set([RESEARCH_MODEL, RESEARCH_FALLBACK_MODEL, MODEL])];
+  const GLOBAL_DEADLINE_MS = 150_000;
+  const started = Date.now();
+  let lastError: unknown = null;
+
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i];
+    const isBaseline = i === chain.length - 1;
+    const remaining = GLOBAL_DEADLINE_MS - (Date.now() - started);
+    if (remaining < 20_000) break; // not enough time for a useful attempt
+    const timeoutMs = Math.min(isBaseline ? 45_000 : 90_000, remaining);
     try {
-      const result = await runAttempt(RESEARCH_MODEL, 90_000, 8, 6000);
-      if (result.comps.length > 0) return result;
-      console.error(
-        `Research on ${RESEARCH_MODEL} returned 0 comps — falling back to ${MODEL}`
+      const result = await runAttempt(
+        model,
+        timeoutMs,
+        isBaseline ? 5 : 8,
+        isBaseline ? 3000 : 6000
       );
+      if (result.comps.length > 0) return result;
+      console.error(`Research on ${model} returned 0 comps — trying next tier`);
     } catch (err) {
-      primaryError = err;
-      console.error(`Research on ${RESEARCH_MODEL} failed, falling back to ${MODEL}:`, err);
+      lastError = lastError ?? err;
+      console.error(`Research on ${model} failed, trying next tier:`, err);
     }
   }
-  try {
-    return await runAttempt(MODEL, 45_000, 5, 3000);
-  } catch (err) {
-    // Surface the primary failure if both died — it's the more informative one.
-    throw primaryError ?? err;
-  }
+  // Every tier failed — surface the first (most informative) error.
+  throw lastError ?? new Error("Research produced no comps on any model tier.");
 }
