@@ -9,17 +9,18 @@ import {
   Tag,
   TrendingUp,
   Trophy,
-  Handshake,
   Search,
   Target,
 } from "lucide-react";
 import {
   getItem,
   parseAttributes,
+  parseBySource,
   parseNetProceeds,
   parsePriceTrend,
   parseDemand,
 } from "@/lib/item";
+import { NewVsResaleCard } from "@/components/NewVsResale";
 import { sourcingMetrics, negotiation, bestSellingOption } from "@/lib/analysis/deal";
 import { currentUserId } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
@@ -438,40 +439,14 @@ async function ItemPageInner({
             item.status !== "bought" &&
             item.status !== "listed" && <SourcingCard metrics={sourcing} />}
 
-          {/* Negotiation assistant */}
-          {neg && (
-            <Card className="p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <Handshake className="h-4 w-4 text-accent" />
-                <h2 className="font-semibold">Negotiation assistant</h2>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-border bg-surface-2/50 px-4 py-3">
-                  <div className="text-xs uppercase tracking-wide text-muted">
-                    Opening offer
-                  </div>
-                  <div className="mt-0.5 text-xl font-semibold tabular-nums">
-                    {formatCurrency(neg.opening)}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-border bg-surface-2/50 px-4 py-3">
-                  <div className="text-xs uppercase tracking-wide text-muted">
-                    Walk-away max
-                  </div>
-                  <div className="mt-0.5 text-xl font-semibold tabular-nums">
-                    {formatCurrency(neg.maxBuy)}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 rounded-lg bg-surface-2 px-3 py-2">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs uppercase tracking-wide text-muted">Script</span>
-                  <CopyButton text={neg.script} />
-                </div>
-                <p className="text-sm leading-relaxed text-fg/90">{neg.script}</p>
-              </div>
-            </Card>
-          )}
+          {/* New vs. resale — the spread that makes or breaks the flip */}
+          <NewVsResaleCard
+            retailPrice={item.retailPrice}
+            retailNote={item.retailNote}
+            median={item.recommendedMedian}
+            bySource={parseBySource(item.bySource)}
+            searchQuery={item.searchQuery ?? item.name}
+          />
 
           {/* Demand & sell-through */}
           {demand && <DemandCard demand={demand} />}

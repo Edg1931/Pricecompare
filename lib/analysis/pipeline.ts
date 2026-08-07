@@ -16,6 +16,7 @@ export interface AnalysisResult {
   marketContext: string | null;
   trend: PriceTrend | null;
   demand: Demand | null;
+  retail: { price: number; note: string | null } | null;
   listing: { title: string; description: string } | null;
 }
 
@@ -49,7 +50,7 @@ export async function priceAndAnalyze(
   const googleComps = googleCompsR.status === "fulfilled" ? googleCompsR.value : [];
   const research    = researchR.status    === "fulfilled"
     ? researchR.value
-    : { comps: [], marketContext: null, trend: null, demand: null };
+    : { comps: [], marketContext: null, trend: null, demand: null, retail: null };
   const listing     = listingR.status     === "fulfilled" ? listingR.value     : null;
   if (researchR.status === "rejected")  console.error("Research failed:",  researchR.reason);
   if (listingR.status  === "rejected")  console.error("Listing gen failed:", listingR.reason);
@@ -81,6 +82,7 @@ export async function priceAndAnalyze(
     marketContext: research.marketContext,
     trend: research.trend,
     demand: research.demand,
+    retail: research.retail,
     listing,
   };
 }

@@ -33,6 +33,9 @@ export async function persistAnalysis(
       priceConfidence: aggregate.confidence,
       sampleSize: aggregate.sampleSize,
       marketContext: result.marketContext,
+      retailPrice: result.retail?.price ?? null,
+      retailNote: result.retail?.note ?? null,
+      bySource: JSON.stringify(aggregate.bySource),
       askingPrice: opts.askingPrice,
       dealScore: deal.dealScore,
       verdict: deal.verdict,
@@ -110,6 +113,20 @@ export function parseAttributes(json: string | null): { label: string; value: st
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+
+export function parseBySource(
+  json: string | null
+): Record<string, { count: number; median: number }> {
+  if (!json) return {};
+  try {
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, { count: number; median: number }>)
+      : {};
+  } catch {
+    return {};
   }
 }
 

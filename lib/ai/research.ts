@@ -5,13 +5,15 @@ import type {
   PriceTrend,
   RawComp,
 } from "@/lib/types";
-import { getAnthropic, MODEL } from "./client";
+import { getAnthropic, RESEARCH_MODEL } from "./client";
 
 export interface ResearchResult {
   comps: RawComp[];
   marketContext: string | null;
   trend: PriceTrend | null;
   demand: Demand | null;
+  /** What the item sells for NEW right now, if it's still sold new. */
+  retail: { price: number; note: string | null } | null;
 }
 
 function parseDemand(obj: unknown): Demand | null {
@@ -118,7 +120,11 @@ Search query: ${ident.searchQuery}
 
 Use web search to find comparable listings and recent sold prices across eBay, Etsy, Mercari, Facebook Marketplace, Swappa, Poshmark, and StockX. If you cannot find this exact item on resale sites, research the web to figure out what it is and find the closest comparable items, then price those.
 
+COVERAGE IS REQUIRED, not optional: do NOT return comps from only one marketplace. At minimum, search eBay (both sold/completed AND active listings) AND at least two other marketplaces that fit the category before answering. A result set dominated by a single niche site (e.g. only Swappa) is a failed research job — eBay is the largest resale market and almost always has listings for any mainstream item.
+
 PRIORITIZE recent eBay SOLD/completed listings — these are the most accurate comps for resale value. Search eBay's sold/completed results (e.g. eBay sold listings for the item) and include several with "listingType": "sold", the actual SOLD price, and the eBay item URL. Sold comps matter more than active asking prices, so include as many real sold comps as you can find.
+
+ALSO find what this item sells for BRAND NEW right now (current retail: manufacturer site, Amazon, Best Buy, Walmart, etc.). If it's discontinued, use the current street price for a new/sealed unit. Report it in "retail". New-vs-used spread is a key resale signal.
 
 CONDITION MATTERS: this item is in ${ident.condition ?? "unknown"} condition. Prefer comps in the same or similar condition, and make your price reflect THIS item's condition — a worn/used item should be priced below mint/new comps. Note in marketContext if condition materially changes the value.
 
@@ -131,6 +137,10 @@ Also assess demand: how quickly and reliably this item sells (sell-through), a r
 After researching, respond with ONLY a JSON object in a \`\`\`json code block, in this exact shape:
 {
   "marketContext": "1-2 sentence summary of demand, typical price range, and how confident you are.",
+  "retail": {
+    "price": 799.00,
+    "note": "1 short sentence: where it's sold new at this price (e.g. 'Apple.com / Best Buy current price'), or that it's discontinued."
+  },
   "trend": {
     "current": 123.45,
     "m3": 120.00,
@@ -150,7 +160,7 @@ After researching, respond with ONLY a JSON object in a \`\`\`json code block, i
   ]
 }
 
-For the trend and demand, use null for anything you genuinely cannot estimate. Include 5-15 of the most relevant comps with real prices in USD. Only include comps you actually found.
+For retail, trend, and demand, use null for anything you genuinely cannot establish. Include 8-15 of the most relevant comps with real prices in USD, spread across marketplaces per the coverage rule. Only include comps you actually found.
 
 CRITICAL accuracy rules for comps:
 - The "price" MUST be the exact price shown on the page at "url" — never an approximation, rounded guess, or a price from a different listing.
@@ -159,22 +169,23 @@ CRITICAL accuracy rules for comps:
 - For "sold" comps: only include a "url" if that exact sold price is actually viewable at that URL. eBay/marketplace sold items are often relisted at different prices, so if the link would show a different (active) price, set "url" to null.
 - Prefer fewer, verifiable comps over many uncertain ones.`;
 
-  // Hard cap at 45 s so the Vercel function always has time for the Prisma
-  // writes that follow. AbortSignal.timeout is Node 17+ / all Vercel runtimes.
+  // Hard cap at 75 s so the Vercel function always has time for the Prisma
+  // writes that follow (the items route allows 150 s total). Opus with up to
+  // 8 searches needs more room than the old 45 s Sonnet budget.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new Error("research timeout")), 45_000);
+  const timer = setTimeout(() => controller.abort(new Error("research timeout")), 75_000);
 
   let response;
   try {
     response = await anthropic.messages.create(
       {
-        model: MODEL,
-        max_tokens: 3000,
+        model: RESEARCH_MODEL,
+        max_tokens: 4000,
         tools: [
           {
             type: "web_search_20250305",
             name: "web_search",
-            max_uses: 5,
+            max_uses: 8,
           } as never,
         ],
         messages: [{ role: "user", content: prompt }],
@@ -191,8 +202,25 @@ CRITICAL accuracy rules for comps:
     .join("\n");
 
   const parsed = extractJsonBlock(text) as
-    | { marketContext?: string; comps?: unknown[]; trend?: unknown; demand?: unknown }
+    | {
+        marketContext?: string;
+        comps?: unknown[];
+        trend?: unknown;
+        demand?: unknown;
+        retail?: unknown;
+      }
     | null;
+
+  const parseRetail = (obj: unknown): ResearchResult["retail"] => {
+    if (!obj || typeof obj !== "object") return null;
+    const r = obj as Record<string, unknown>;
+    const price = Number(r.price);
+    if (!Number.isFinite(price) || price <= 0) return null;
+    return {
+      price,
+      note: typeof r.note === "string" ? r.note.slice(0, 300) : null,
+    };
+  };
 
   if (!parsed || !Array.isArray(parsed.comps)) {
     return {
@@ -200,6 +228,7 @@ CRITICAL accuracy rules for comps:
       marketContext: null,
       trend: parseTrend(parsed?.trend),
       demand: parseDemand(parsed?.demand),
+      retail: parseRetail(parsed?.retail),
     };
   }
 
@@ -235,5 +264,6 @@ CRITICAL accuracy rules for comps:
       typeof parsed.marketContext === "string" ? parsed.marketContext : null,
     trend: parseTrend(parsed.trend),
     demand: parseDemand(parsed.demand),
+    retail: parseRetail(parsed.retail),
   };
 }

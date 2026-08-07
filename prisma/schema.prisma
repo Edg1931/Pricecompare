@@ -33,6 +33,9 @@ model Item {
   priceConfidence   Float? // 0..1
   sampleSize        Int     @default(0)
   marketContext     String?
+  retailPrice       Float?  // what it goes for NEW right now
+  retailNote        String? // where the new price was found / context
+  bySource          String? // JSON: per-marketplace {count, median} snapshot
 
   // Deal analysis
   askingPrice       Float?
