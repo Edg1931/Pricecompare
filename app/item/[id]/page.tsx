@@ -70,7 +70,8 @@ export default async function ItemPage({
   const sourcing = sourcingMetrics(
     item.recommendedMedian,
     item.askingPrice,
-    netProceeds
+    netProceeds,
+    item.category
   );
   const fullListing = [item.listingTitle, item.listingDescription]
     .filter(Boolean)

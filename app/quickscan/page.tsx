@@ -6,6 +6,7 @@ import { Camera, Zap, RotateCcw } from "lucide-react";
 import { fileToDataUrl } from "@/lib/image";
 import { readJson, formatCurrency } from "@/lib/utils";
 import { searchUrlForSource } from "@/lib/marketplaces";
+import { negotiation } from "@/lib/analysis/deal";
 import type { Verdict } from "@/lib/types";
 
 interface ItemResult {
@@ -49,14 +50,22 @@ export default function QuickScanPage() {
       }
       // Fetch full item data to get verdict + recommendedMedian.
       // The API wraps the payload as { item: {...} }.
-      const itemRes = await fetch(`/api/items/${data.id}`);
-      const detail = await readJson(itemRes);
-      const item = (detail.item ?? {}) as {
+      // The analysis is already paid for and saved at this point — if this
+      // follow-up read fails, still show the result screen (NO VERDICT) with
+      // the link to the saved item rather than throwing the work away.
+      let item: {
         verdict?: Verdict | null;
         recommendedMedian?: number | null;
         searchQuery?: string | null;
         name?: string | null;
-      };
+      } = {};
+      try {
+        const itemRes = await fetch(`/api/items/${data.id}`);
+        const detail = await readJson(itemRes);
+        item = (detail.item ?? {}) as typeof item;
+      } catch {
+        // Fall through with empty item — the saved analysis is still linked.
+      }
       setResult({
         id: data.id,
         verdict: item.verdict ?? null,
@@ -110,7 +119,9 @@ export default function QuickScanPage() {
     if (verdict === "STEAL") {
       cardClass = "bg-steal/20 border-steal/40 text-steal";
       headlineText = "BUY IT";
-      subText = `Max buy: ${formatCurrency(median * 0.6)}`;
+      // Same rounded ceiling the item page's negotiation card shows.
+      const maxBuy = negotiation(median, null)?.maxBuy;
+      subText = maxBuy != null ? `Max buy: ${formatCurrency(maxBuy)}` : `Worth ~${formatCurrency(median)}`;
     } else if (verdict === "GOOD") {
       cardClass = "bg-steal/20 border-steal/40 text-steal";
       headlineText = "GOOD DEAL";

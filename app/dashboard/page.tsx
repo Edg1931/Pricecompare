@@ -133,7 +133,7 @@ export default async function DashboardPage() {
               {formatCurrency(totalNet)}
             </span>
           }
-          sub={`${formatCurrency(totalRevenue)} revenue`}
+          sub={`${formatCurrency(totalRevenue)} revenue · pre-tax, before business expenses`}
         />
         <Stat label="Items sold" value={sold.length} />
         <Stat label="Avg ROI" value={avgRoi != null ? `${avgRoi}%` : "—"} />

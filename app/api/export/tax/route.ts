@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { currentUserId, ownerWhere } from "@/lib/auth";
+import { ownerScope, ownerWhere } from "@/lib/auth";
+import { marketplaceFee } from "@/lib/analysis/deal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,10 +25,13 @@ function money(n: number): string {
 // the cash-basis matching rule, an item's purchase only becomes COGS the year
 // it's sold. Items purchased but not yet sold are inventory and don't appear.
 export async function GET(req: Request) {
-  const userId = await currentUserId();
-  if (!userId) {
+  // ownerScope (not a hard userId check) so the export works in open mode
+  // exactly like every other data route.
+  const scope = await ownerScope();
+  if (!scope.ok) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = scope.userId;
 
   const url = new URL(req.url);
   const yearParam = url.searchParams.get("year");
@@ -56,14 +60,25 @@ export async function GET(req: Request) {
     orderBy: { date: "asc" },
   });
 
+  // Same fallbacks the on-screen P&L uses (inventory/expenses pages), so the
+  // number the user files matches the number the app shows: cost falls back
+  // to the asking price paid, fees fall back to the marketplace's rate.
+  const itemCost = (it: { purchasePrice: number | null; askingPrice: number | null }) =>
+    it.purchasePrice ?? it.askingPrice ?? 0;
+  const itemFees = (it: {
+    soldFees: number | null;
+    soldMarketplace: string | null;
+    soldPrice: number | null;
+  }) => it.soldFees ?? marketplaceFee(it.soldMarketplace, it.soldPrice ?? 0);
+
   let totalRevenue = 0;
   let totalCOGS = 0;
   let totalSaleFees = 0;
   let totalSaleShipping = 0;
   for (const it of soldItems) {
     totalRevenue += it.soldPrice ?? 0;
-    totalCOGS += it.purchasePrice ?? 0;
-    totalSaleFees += it.soldFees ?? 0;
+    totalCOGS += itemCost(it);
+    totalSaleFees += itemFees(it);
     totalSaleShipping += it.shippingCost ?? 0;
   }
 
@@ -97,6 +112,10 @@ export async function GET(req: Request) {
 
   row(`Schedule C — Resale Activity — Year ${year}`);
   row("Generated", new Date().toISOString().slice(0, 10));
+  row(
+    "Note",
+    "Fees/COGS use recorded values where present; otherwise fees are estimated from marketplace rates and cost falls back to the price you paid at purchase."
+  );
   row("");
 
   row("Schedule C line summary");
@@ -135,9 +154,9 @@ export async function GET(req: Request) {
     "Net"
   );
   for (const it of soldItems) {
-    const fees = it.soldFees ?? 0;
+    const fees = itemFees(it);
     const ship = it.shippingCost ?? 0;
-    const cost = it.purchasePrice ?? 0;
+    const cost = itemCost(it);
     const sold = it.soldPrice ?? 0;
     const net = sold - fees - ship - cost;
     row(

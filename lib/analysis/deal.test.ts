@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   analyzeDeal,
+  bestSellingOption,
   computeNetProceeds,
   marketplaceFee,
   negotiation,
@@ -67,6 +68,44 @@ describe("computeNetProceeds", () => {
     const nets = computeNetProceeds(100);
     expect(nets[0].platform).toBe("Facebook Marketplace");
     expect(nets[0].net).toBe(100);
+  });
+});
+
+describe("bestSellingOption", () => {
+  const nets = computeNetProceeds(100);
+
+  it("never recommends the zero-fee local channel", () => {
+    expect(bestSellingOption(nets, null)!.platform).not.toBe("Facebook Marketplace");
+    expect(bestSellingOption(nets, "Electronics")!.platform).not.toBe(
+      "Facebook Marketplace"
+    );
+  });
+
+  it("only recommends specialists when the category fits", () => {
+    // No category: generals only (eBay/Mercari), even though Swappa nets more.
+    const generic = bestSellingOption(nets, null)!;
+    expect(["eBay", "Mercari"]).toContain(generic.platform);
+
+    // Tech category unlocks Swappa (3% — highest shipped net).
+    expect(bestSellingOption(nets, "Consumer Electronics — Phone")!.platform).toBe(
+      "Swappa"
+    );
+    // Clothing unlocks Poshmark eligibility but eBay/Mercari still net more.
+    const clothing = bestSellingOption(nets, "Clothing & Apparel")!;
+    expect(["eBay", "Mercari"]).toContain(clothing.platform);
+    // Vintage unlocks Etsy (9% + 0.20 beats eBay/Mercari).
+    expect(bestSellingOption(nets, "Vintage kitchenware")!.platform).toBe("Etsy");
+  });
+
+  it("flows into analyzeDeal's bestPlatform and profit numbers", () => {
+    const deal = analyzeDeal(100, 50, 10, "Video game console");
+    expect(deal.bestPlatform).toBe("Swappa"); // console matches Swappa + StockX; Swappa nets more
+    expect(deal.estimatedProfit).toBe(47); // 100*0.97 - 50
+    const noCat = analyzeDeal(100, 50, 10);
+    expect(noCat.bestPlatform).not.toBe("Facebook Marketplace");
+    // eBay nets 86.45, Mercari 86.6 → Mercari at $100
+    expect(noCat.bestPlatform).toBe("Mercari");
+    expect(noCat.estimatedProfit).toBeCloseTo(36.6, 2);
   });
 });
 

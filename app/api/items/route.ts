@@ -9,7 +9,10 @@ import { authEnabled } from "@/lib/supabase/config";
 import type { ItemIdentification } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Vision (up to 40s) + research (up to 45s) + comp verification + DB writes
+// can legitimately exceed 60s; a mid-flight kill costs the AI spend and
+// saves nothing. Fluid compute allows 300s even on Hobby.
+export const maxDuration = 150;
 
 // When provided, an already-identified item (e.g. from lot mode) skips vision
 // and goes straight to pricing.
@@ -65,12 +68,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate-limit item creation to bound AI spend: 20/hour globally in open
-  // (unauthenticated) mode, 60/hour per signed-in user (a throwaway account
-  // must not be able to drain the Anthropic budget).
+  // Rate-limit item creation to bound AI spend: 40/hour globally in open
+  // (unauthenticated) mode — enough for a 20-item lot plus normal scanning —
+  // and 60/hour per signed-in user (a throwaway account must not be able to
+  // drain the Anthropic budget).
   {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const limit = userId ? 60 : 20;
+    const limit = userId ? 60 : 40;
     const recentCount = await prisma.item.count({
       where: { userId: userId ?? null, createdAt: { gte: oneHourAgo } },
     });
@@ -124,11 +128,12 @@ export async function POST(req: Request) {
   // and a userId, check for potential duplicates before proceeding.
   const activeIdent = identification ?? barcodeIdent;
   if (activeIdent && userId) {
-    const firstWord = activeIdent.name.trim().split(/\s+/)[0];
+    // Match on the full name — matching the first word alone made lot mode
+    // flag "Vintage Radio" as a duplicate of "Vintage Pyrex Bowl".
     const existingItem = await prisma.item.findFirst({
       where: {
         ...ownerWhere(userId),
-        name: { contains: firstWord, mode: "insensitive" },
+        name: { equals: activeIdent.name.trim(), mode: "insensitive" },
         soldPrice: null,
       },
       select: { id: true, name: true },

@@ -18,12 +18,35 @@ export default async function InventoryPage() {
     prisma.item.findMany({
       where: ownerWhere(userId),
       orderBy: { createdAt: "desc" },
-      include: { photos: { orderBy: { order: "asc" }, take: 1 } },
+      // Only the fields this page renders — the full row drags multi-KB
+      // text columns (listingDescription, marketContext, …) per item.
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        purchasePrice: true,
+        askingPrice: true,
+        soldPrice: true,
+        soldMarketplace: true,
+        soldFees: true,
+        shippingCost: true,
+        soldAt: true,
+        boughtAt: true,
+        createdAt: true,
+        storageLocation: true,
+        netProceeds: true,
+        photos: { orderBy: { order: "asc" }, take: 1, select: { url: true } },
+      },
     }),
   ]);
 
   const holding = items.filter(
     (i) => (i.status === "bought" || i.status === "listed") && i.soldPrice == null
+  );
+  // Marked sold but no price recorded yet — must stay visible (they used to
+  // fall out of both buckets and silently vanish from all totals).
+  const soldNeedsPrice = items.filter(
+    (i) => i.status === "sold" && i.soldPrice == null
   );
   const sold = items
     .filter((i) => i.soldPrice != null)
@@ -108,7 +131,7 @@ export default async function InventoryPage() {
     })),
   ];
 
-  const hasData = holding.length > 0 || sold.length > 0;
+  const hasData = holding.length > 0 || sold.length > 0 || soldNeedsPrice.length > 0;
 
   return (
     <div className="space-y-7">
@@ -267,6 +290,41 @@ export default async function InventoryPage() {
                     </Link>
                   );
                 })}
+              </div>
+            </section>
+          )}
+
+          {/* Sold but missing the sale price — excluded from P&L until fixed */}
+          {soldNeedsPrice.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold">
+                Needs sold price{" "}
+                <span className="text-sm font-normal text-muted">
+                  ({soldNeedsPrice.length})
+                </span>
+              </h2>
+              <p className="mb-2 text-xs text-muted">
+                Marked sold without a price — these are left out of revenue and
+                P&amp;L until you add what they sold for.
+              </p>
+              <div className="space-y-2">
+                {soldNeedsPrice.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/item/${item.id}`}
+                    className="flex items-center gap-3 rounded-xl border border-yellow-500/40 bg-surface/70 p-2.5 transition hover:border-brand/60"
+                  >
+                    <Thumb url={item.photos[0]?.url} name={item.name} />
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-sm font-medium">{item.name}</p>
+                      <p className="text-xs text-muted">Tap to add the sold price</p>
+                    </div>
+                    <span className="rounded-full bg-yellow-500/15 px-2.5 py-1 text-xs font-semibold text-yellow-600">
+                      Add price
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted" />
+                  </Link>
+                ))}
               </div>
             </section>
           )}

@@ -66,7 +66,12 @@ export async function priceAndAnalyze(
 
   const comps = [...ebaySold, ...ebayActive, ...googleComps, ...researchComps];
   const aggregate = aggregatePrices(comps);
-  const deal = analyzeDeal(aggregate.median, askingPrice, aggregate.sampleSize);
+  const deal = analyzeDeal(
+    aggregate.median,
+    askingPrice,
+    aggregate.sampleSize,
+    identification.category
+  );
 
   return {
     identification,
