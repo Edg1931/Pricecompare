@@ -45,7 +45,12 @@ export function aggregatePrices(comps: RawComp[]): PriceAggregate {
         : c.price * ACTIVE_HAIRCUT;
   const weighted: number[] = [];
   for (const c of usedComps) {
-    const w = c.listingType === "sold" && c.source === "ebay" ? 2 : 1;
+    // 2× weight for verified sold prices: eBay API sold comps and the
+    // user's OWN recorded sales (the single most trusted signal there is).
+    const w =
+      c.listingType === "sold" && (c.source === "ebay" || c.source === "own")
+        ? 2
+        : 1;
     for (let i = 0; i < w; i++) weighted.push(adjusted(c));
   }
   weighted.sort((a, b) => a - b);
