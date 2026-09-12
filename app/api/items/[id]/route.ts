@@ -26,6 +26,7 @@ const patchSchema = z.object({
   alertDirection: z.enum(["below", "above"]).nullable().optional(),
   dismissAlert: z.boolean().optional(),
   storageLocation: z.string().max(120).nullable().optional(),
+  upc: z.string().regex(/^\d{8,14}$/).nullable().optional(),
 });
 
 export async function GET(
@@ -102,6 +103,17 @@ export async function PATCH(
   const updated = await prisma.item.update({
     where: { id },
     data: {
+      // Editing identity fields invalidates a barcode-derived UPC: after a
+      // misidentified barcode is corrected by name/model/query, repricing
+      // must not keep searching by the old product's GTIN. An explicit upc
+      // in the same request wins over the clear.
+      ...(data.name !== undefined ||
+      data.brand !== undefined ||
+      data.model !== undefined ||
+      data.searchQuery !== undefined
+        ? { upc: null }
+        : {}),
+      ...(data.upc !== undefined ? { upc: data.upc } : {}),
       ...(data.askingPrice !== undefined ? { askingPrice: data.askingPrice } : {}),
       ...(data.notes !== undefined ? { notes: data.notes } : {}),
       ...(data.status !== undefined ? { status: data.status } : {}),
