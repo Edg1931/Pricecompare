@@ -103,14 +103,17 @@ export async function PATCH(
   const updated = await prisma.item.update({
     where: { id },
     data: {
-      // Editing identity fields invalidates a barcode-derived UPC: after a
+      // A CHANGED identity field invalidates a barcode-derived UPC: after a
       // misidentified barcode is corrected by name/model/query, repricing
-      // must not keep searching by the old product's GTIN. An explicit upc
-      // in the same request wins over the clear.
-      ...(data.name !== undefined ||
-      data.brand !== undefined ||
-      data.model !== undefined ||
-      data.searchQuery !== undefined
+      // must not keep searching by the old product's GTIN. Compare against
+      // the stored values — the edit form resends unchanged fields, and a
+      // no-op save must not wipe a valid UPC. An explicit upc in the same
+      // request wins over the clear.
+      ...((data.name !== undefined && data.name !== existing.name) ||
+      (data.brand !== undefined && (data.brand ?? null) !== existing.brand) ||
+      (data.model !== undefined && (data.model ?? null) !== existing.model) ||
+      (data.searchQuery !== undefined &&
+        (data.searchQuery ?? null) !== existing.searchQuery)
         ? { upc: null }
         : {}),
       ...(data.upc !== undefined ? { upc: data.upc } : {}),
