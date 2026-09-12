@@ -10,12 +10,26 @@ export const maxDuration = 300;
 // have crossed their target. Runs 3 reprices in parallel (each ~30-45 s) so we
 // can clear ~3 items per cron invocation instead of 1.
 export async function GET(req: Request) {
+  // Database keep-alive, BEFORE any auth gate: Supabase's free tier pauses
+  // projects after ~a week without database activity, which has twice taken
+  // down auth + data for this app (DNS_PROBE_FINISHED_NXDOMAIN on login).
+  // Vercel invokes this route daily regardless of CRON_SECRET, so a trivial
+  // query here keeps the project awake even when the paid repricing work
+  // below stays locked. No data is read or returned.
+  const keepAlive = await prisma
+    .$queryRaw`SELECT 1`
+    .then(() => true)
+    .catch((err) => {
+      console.error("Keep-alive query failed:", err);
+      return false;
+    });
+
   // Fail closed: this endpoint burns AI spend (up to 50 web-search reprices),
   // so it must never run unauthenticated. Same pattern as the backfill route.
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     return NextResponse.json(
-      { error: "CRON_SECRET is not configured — refusing to run." },
+      { error: "CRON_SECRET is not configured — refusing to reprice.", keepAlive },
       { status: 503 }
     );
   }
