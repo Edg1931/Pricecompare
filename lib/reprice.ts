@@ -26,6 +26,7 @@ export async function repriceItem(id: string): Promise<{ median: number | null }
     searchQuery: item.searchQuery ?? item.name,
     confidence: item.identConfidence ?? 0.5,
     reasoning: item.identNotes,
+    upc: item.upc ?? null,
   };
 
   const result = await priceAndAnalyze(ident, item.askingPrice, {

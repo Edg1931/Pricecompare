@@ -27,6 +27,7 @@ export async function persistAnalysis(
       identConfidence: id.confidence,
       identNotes: id.reasoning,
       searchQuery: id.searchQuery,
+      upc: id.upc ?? null,
       recommendedLow: aggregate.low,
       recommendedMedian: aggregate.median,
       recommendedHigh: aggregate.high,
