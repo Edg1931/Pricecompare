@@ -19,6 +19,15 @@ describe("nameSimilarity", () => {
     ).toBe(1);
   });
 
+  it("disqualifies conflicting model identifiers", () => {
+    expect(nameSimilarity("Canon EOS R5", "Canon EOS R6")).toBe(0);
+    expect(nameSimilarity("Sony PS5 Console", "Sony PS4 Console")).toBe(0);
+    // Shared model number stays a match even when other tokens differ.
+    expect(
+      nameSimilarity("iPhone 13 Pro 128GB", "iPhone 13 Pro 256GB")
+    ).toBeGreaterThanOrEqual(0.6);
+  });
+
   it("scores unrelated items low", () => {
     expect(nameSimilarity("Vintage Radio", "Vintage Pyrex Bowl")).toBeLessThan(0.6);
     expect(nameSimilarity("Nintendo Switch OLED", "KitchenAid Mixer")).toBe(0);

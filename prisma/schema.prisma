@@ -25,6 +25,7 @@ model Item {
   identConfidence   Float? // 0..1
   identNotes        String?
   searchQuery       String?
+  upc               String? // UPC/EAN when identified via barcode — exact-product repricing
 
   // Pricing (aggregated from eBay + web research)
   recommendedLow    Float?

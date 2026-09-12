@@ -7,26 +7,43 @@ const STOP_WORDS = new Set([
   "size", "series", "edition", "original", "authentic", "genuine",
 ]);
 
-/** Lowercased, de-noised tokens that actually identify a product. */
+/** Lowercased, de-noised tokens that actually identify a product. Short
+ * tokens are kept when they carry a digit — "R5", "PS5", "13" are often the
+ * only thing separating product variants. */
 export function significantTokens(s: string): Set<string> {
   return new Set(
     s
       .toLowerCase()
       .replace(/[^a-z0-9 ]/g, " ")
       .split(/\s+/)
-      .filter((t) => t.length > 2 && !STOP_WORDS.has(t))
+      .filter(
+        (t) =>
+          (t.length > 2 || (t.length === 2 && /\d/.test(t))) &&
+          !STOP_WORDS.has(t)
+      )
   );
 }
 
 /**
  * 0..1 overlap between two listing names, measured against the shorter one
  * so "Apple Watch Ultra" fully contained in "Apple Watch Ultra 49mm GPS
- * Titanium" scores 1.
+ * Titanium" scores 1. Conflicting model identifiers are disqualifying:
+ * "Canon EOS R5" vs "Canon EOS R6" is 0, not a near-match — pricing one
+ * variant off another's sale is exactly the error this must prevent.
  */
 export function nameSimilarity(a: string, b: string): number {
   const ta = significantTokens(a);
   const tb = significantTokens(b);
   if (ta.size === 0 || tb.size === 0) return 0;
+  const modelsA = [...ta].filter((t) => /\d/.test(t));
+  const modelsB = [...tb].filter((t) => /\d/.test(t));
+  if (
+    modelsA.length > 0 &&
+    modelsB.length > 0 &&
+    !modelsA.some((t) => tb.has(t))
+  ) {
+    return 0;
+  }
   let shared = 0;
   for (const t of ta) if (tb.has(t)) shared++;
   return shared / Math.min(ta.size, tb.size);
