@@ -7,7 +7,8 @@ export type CompSource =
   | "poshmark"
   | "stockx"
   | "web"
-  | "google";
+  | "google"
+  | "own"; // the user's own recorded sale — the most trusted comp there is
 
 export interface RawComp {
   source: CompSource;
@@ -31,6 +32,8 @@ export interface ItemIdentification {
   searchQuery: string;
   confidence: number; // 0..1
   reasoning?: string | null;
+  /** UPC/EAN when identified via barcode — enables exact-product search. */
+  upc?: string | null;
 }
 
 export interface PriceAggregate {

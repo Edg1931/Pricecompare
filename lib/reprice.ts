@@ -28,7 +28,11 @@ export async function repriceItem(id: string): Promise<{ median: number | null }
     reasoning: item.identNotes,
   };
 
-  const result = await priceAndAnalyze(ident, item.askingPrice, { skipListing: true });
+  const result = await priceAndAnalyze(ident, item.askingPrice, {
+    skipListing: true,
+    userId: item.userId,
+    excludeItemId: item.id,
+  });
   const median = result.aggregate.median;
 
   // If every pricing source failed (AI outage, no credits, network), refuse to

@@ -136,7 +136,9 @@ export async function researchPrices(
 
 Item: ${descriptor}
 Category: ${ident.category ?? "unknown"}
-Search query: ${ident.searchQuery}
+Search query: ${ident.searchQuery}${
+    ident.upc ? `\nUPC/EAN barcode: ${ident.upc} — search by this exact barcode too ("${ident.upc}" and "UPC ${ident.upc}"); it pins the exact product/variant.` : ""
+  }
 
 Use web search to find comparable listings and recent sold prices across eBay, Etsy, Mercari, Facebook Marketplace, Swappa, Poshmark, and StockX. If you cannot find this exact item on resale sites, research the web to figure out what it is and find the closest comparable items, then price those.
 

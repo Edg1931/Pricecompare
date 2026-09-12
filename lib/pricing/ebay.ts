@@ -120,12 +120,21 @@ export async function fetchEbayItemImage(itemUrl: string): Promise<string | null
   return live && typeof live === "object" ? live.imageUrl : null;
 }
 
-export async function searchEbay(query: string, limit = 20): Promise<RawComp[]> {
+export async function searchEbay(
+  query: string,
+  limit = 20,
+  gtin?: string | null
+): Promise<RawComp[]> {
   const token = await getToken(BASE_SCOPE);
-  if (!token || !query.trim()) return [];
+  if (!token || (!query.trim() && !gtin)) return [];
 
   const url = new URL(BROWSE_URL);
-  url.searchParams.set("q", query);
+  // A UPC/EAN (gtin) matches the exact product, beating any text query.
+  if (gtin && /^\d{8,14}$/.test(gtin)) {
+    url.searchParams.set("gtin", gtin);
+  } else {
+    url.searchParams.set("q", query);
+  }
   url.searchParams.set("limit", String(Math.min(limit, 50)));
   url.searchParams.set("filter", "buyingOptions:{FIXED_PRICE}");
 

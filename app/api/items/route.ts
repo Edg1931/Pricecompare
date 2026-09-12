@@ -27,6 +27,7 @@ const identificationSchema = z.object({
   searchQuery: z.string().min(1),
   confidence: z.number().optional(),
   reasoning: z.string().nullable().optional(),
+  upc: z.string().regex(/^\d{8,14}$/).nullable().optional(),
 });
 
 const createSchema = z.object({
@@ -115,6 +116,7 @@ export async function POST(req: Request) {
               searchQuery: [item0.brand, item0.title].filter(Boolean).join(" "),
               confidence: 0.85,
               reasoning: `Identified via UPC ${upcHint}`,
+              upc: upcHint,
             };
           }
         }
@@ -160,10 +162,12 @@ export async function POST(req: Request) {
             attributes: activeIdent.attributes ?? [],
             confidence: activeIdent.confidence ?? 0.6,
             reasoning: activeIdent.reasoning ?? null,
+            upc: activeIdent.upc ?? null,
           } satisfies ItemIdentification,
-          askingPrice ?? null
+          askingPrice ?? null,
+          { userId }
         )
-      : await analyzeFromImages(images, askingPrice ?? null, hint);
+      : await analyzeFromImages(images, askingPrice ?? null, hint, { userId });
     const id = await persistAnalysis(result, {
       imageDataUrls: images,
       askingPrice: askingPrice ?? null,

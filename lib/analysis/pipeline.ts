@@ -4,6 +4,7 @@ import { researchPrices } from "@/lib/ai/research";
 import { generateListing } from "@/lib/ai/listing";
 import { searchEbay, searchEbaySold, hasEbay } from "@/lib/pricing/ebay";
 import { searchGoogleShopping } from "@/lib/pricing/google";
+import { ownSoldComps } from "@/lib/pricing/own";
 import { verifyCompLinks } from "@/lib/pricing/verify";
 import { aggregatePrices } from "@/lib/pricing/aggregate";
 import { analyzeDeal } from "@/lib/analysis/deal";
@@ -27,7 +28,13 @@ export interface AnalysisResult {
 export async function priceAndAnalyze(
   identification: ItemIdentification,
   askingPrice: number | null,
-  opts?: { skipListing?: boolean }
+  opts?: {
+    skipListing?: boolean;
+    /** Owner scope for comp memory (the user's own past sales as comps). */
+    userId?: string | null;
+    /** Item being repriced — excluded from its own comp-memory matches. */
+    excludeItemId?: string;
+  }
 ): Promise<AnalysisResult> {
   // Run pricing research and listing generation concurrently so the listing
   // doesn't add to the critical path (it would otherwise push us past
@@ -36,18 +43,20 @@ export async function priceAndAnalyze(
   // Use allSettled so a failure in one source (e.g. Anthropic timeout, eBay
   // scope not approved) doesn't abort the whole analysis.
   const settled = await Promise.allSettled([
-    hasEbay() ? searchEbay(identification.searchQuery) : Promise.resolve([]),
+    hasEbay() ? searchEbay(identification.searchQuery, 20, identification.upc) : Promise.resolve([]),
     hasEbay() ? searchEbaySold(identification.searchQuery) : Promise.resolve([]),
     searchGoogleShopping(identification.searchQuery, 10),
     researchPrices(identification),
+    ownSoldComps(opts?.userId ?? null, identification, opts?.excludeItemId),
     // Reprices skip listing generation: it costs a full Sonnet call and would
     // overwrite any edits the user made to the generated listing.
     opts?.skipListing ? Promise.resolve(null) : generateListing(identification, null),
   ]);
-  const [ebayActiveR, ebaySoldR, googleCompsR, researchR, listingR] = settled;
+  const [ebayActiveR, ebaySoldR, googleCompsR, researchR, ownR, listingR] = settled;
   const ebayActive  = ebayActiveR.status  === "fulfilled" ? ebayActiveR.value  : [];
   const ebaySold    = ebaySoldR.status    === "fulfilled" ? ebaySoldR.value    : [];
   const googleComps = googleCompsR.status === "fulfilled" ? googleCompsR.value : [];
+  const ownComps    = ownR.status         === "fulfilled" ? ownR.value         : [];
   const research    = researchR.status    === "fulfilled"
     ? researchR.value
     : { comps: [], marketContext: null, trend: null, demand: null, retail: null };
@@ -65,7 +74,7 @@ export async function priceAndAnalyze(
     console.error("Comp link verification failed:", err);
   }
 
-  const comps = [...ebaySold, ...ebayActive, ...googleComps, ...researchComps];
+  const comps = [...ownComps, ...ebaySold, ...ebayActive, ...googleComps, ...researchComps];
   const aggregate = aggregatePrices(comps);
   const deal = analyzeDeal(
     aggregate.median,
@@ -91,8 +100,9 @@ export async function priceAndAnalyze(
 export async function analyzeFromImages(
   imageDataUrls: string[],
   askingPrice: number | null,
-  userHint?: string
+  userHint?: string,
+  opts?: { userId?: string | null }
 ): Promise<AnalysisResult> {
   const identification = await identifyItem(imageDataUrls, userHint);
-  return priceAndAnalyze(identification, askingPrice);
+  return priceAndAnalyze(identification, askingPrice, { userId: opts?.userId });
 }
